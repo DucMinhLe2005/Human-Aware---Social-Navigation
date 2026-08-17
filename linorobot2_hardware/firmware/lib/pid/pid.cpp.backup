@@ -1,0 +1,126 @@
+// Copyright (c) 2021 Juan Miguel Jimeno
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "pid.h"
+
+PID::PID(
+    float min_val,
+    float max_val,
+    float kp,
+    float ki,
+    float kd
+)
+    : min_val_(min_val),
+      max_val_(max_val),
+      kp_(kp),
+      ki_(ki),
+      kd_(kd),
+      integral_(0.0),
+      derivative_(0.0),
+      prev_error_(0.0)
+{
+}
+
+double PID::compute(
+    float setpoint,
+    float measured_value
+)
+{
+    const double error =
+        static_cast<double>(setpoint) -
+        static_cast<double>(measured_value);
+
+    /*
+     * Tính thành phần tích phân.
+     *
+     * Firmware gọi PID theo chu kỳ cố định 20 ms,
+     * nên giữ cách tính tương thích với PID gốc:
+     * integral = tổng sai số qua từng chu kỳ.
+     */
+    integral_ += error;
+
+    /*
+     * Thành phần vi phân dựa trên sự thay đổi sai số
+     * giữa hai lần gọi liên tiếp.
+     */
+    derivative_ = error - prev_error_;
+
+    double output =
+        static_cast<double>(kp_) * error +
+        static_cast<double>(ki_) * integral_ +
+        static_cast<double>(kd_) * derivative_;
+
+    /*
+     * Chống integral windup:
+     * nếu đầu ra vượt giới hạn và sai số vẫn làm PID
+     * bão hòa thêm, bỏ phần tích phân vừa cộng.
+     */
+    if (output > max_val_)
+    {
+        if (error > 0.0)
+        {
+            integral_ -= error;
+        }
+
+        output = max_val_;
+    }
+    else if (output < min_val_)
+    {
+        if (error < 0.0)
+        {
+            integral_ -= error;
+        }
+
+        output = min_val_;
+    }
+
+    prev_error_ = error;
+
+    return output;
+}
+
+void PID::updateConstants(
+    float kp,
+    float ki,
+    float kd
+)
+{
+    /*
+     * Chỉ nhận các hệ số hữu hạn và không âm.
+     */
+    if (!isfinite(kp) ||
+        !isfinite(ki) ||
+        !isfinite(kd))
+    {
+        return;
+    }
+
+    if (kp < 0.0f ||
+        ki < 0.0f ||
+        kd < 0.0f)
+    {
+        return;
+    }
+
+    kp_ = kp;
+    ki_ = ki;
+    kd_ = kd;
+}
+
+void PID::reset()
+{
+    integral_ = 0.0;
+    derivative_ = 0.0;
+    prev_error_ = 0.0;
+}
