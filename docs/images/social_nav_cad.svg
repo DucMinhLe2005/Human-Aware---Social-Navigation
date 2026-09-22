@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1173" height="824" viewBox="0 0 1173 824">
+  <rect width="1173" height="824" fill="#ffffff"/>
+  <g stroke="#23272f" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- top RGB-D camera -->
+    <g transform="translate(505 70)">
+      <rect x="0" y="0" width="165" height="55" rx="23" fill="#c8c8c8"/>
+      <rect x="12" y="9" width="141" height="37" rx="16" fill="#4a4a4a"/>
+      <circle cx="35" cy="27.5" r="10" fill="#111"/>
+      <circle cx="66" cy="27.5" r="9" fill="#202020"/>
+      <circle cx="99" cy="27.5" r="7" fill="#111"/>
+      <circle cx="129" cy="27.5" r="9" fill="#202020"/>
+      <circle cx="66" cy="27.5" r="3.5" fill="#69a7a7" stroke="none"/>
+      <path d="M145 7 L158 20 L158 37 L145 49" fill="#b0a18d"/>
+      <rect x="72" y="55" width="20" height="26" rx="5" fill="#858585"/>
+      <circle cx="82" cy="69" r="4" fill="#111"/>
+    </g>
+
+    <!-- camera tilt mount -->
+    <g transform="translate(545 146)">
+      <rect x="0" y="0" width="62" height="60" rx="8" fill="#d8d8d8"/>
+      <circle cx="50" cy="28" r="7" fill="#111"/>
+      <rect x="22" y="-18" width="12" height="22" fill="#777"/>
+    </g>
+
+    <!-- aluminium frame top -->
+    <rect x="455" y="205" width="300" height="26" fill="#8d939c"/>
+    <rect x="465" y="211" width="280" height="5" fill="#d9dde1" stroke="none"/>
+    <path d="M470 231 V530 H500 V231 Z" fill="#8d939c"/>
+    <path d="M704 231 V530 H734 V231 Z" fill="#8d939c"/>
+    <rect x="478" y="242" width="6" height="276" fill="#d9dde1" stroke="none"/>
+    <rect x="712" y="242" width="6" height="276" fill="#d9dde1" stroke="none"/>
+
+    <!-- corner brackets -->
+    <path d="M500 242 L545 242 L500 300 Z" fill="#17191d"/>
+    <path d="M704 242 L659 242 L704 300 Z" fill="#17191d"/>
+
+    <!-- upper acrylic plate -->
+    <ellipse cx="602" cy="445" rx="205" ry="72" fill="#dce4e8" fill-opacity="0.22"/>
+    <ellipse cx="602" cy="445" rx="205" ry="72" fill="none" stroke="#777" stroke-width="3"/>
+
+    <!-- lidar support platform -->
+    <path d="M500 412 L690 412 L710 470 L480 470 Z" fill="#25282d"/>
+    <ellipse cx="594" cy="412" rx="63" ry="19" fill="#111"/>
+    <path d="M531 412 V360 Q531 340 551 340 H637 Q657 340 657 360 V412 Z" fill="#1b1c20"/>
+    <ellipse cx="594" cy="340" rx="63" ry="18" fill="#3b3d42"/>
+    <ellipse cx="594" cy="340" rx="42" ry="9" fill="#151618"/>
+
+    <!-- lower acrylic plate -->
+    <ellipse cx="602" cy="548" rx="205" ry="72" fill="#e3e8eb" fill-opacity="0.19"/>
+    <ellipse cx="602" cy="548" rx="205" ry="72" fill="none" stroke="#777" stroke-width="3"/>
+
+    <!-- standoffs -->
+    <g fill="#c7b18a" stroke="#6b5d43" stroke-width="2">
+      <rect x="420" y="447" width="8" height="103"/>
+      <rect x="774" y="447" width="8" height="103"/>
+      <rect x="471" y="496" width="8" height="98"/>
+      <rect x="726" y="496" width="8" height="98"/>
+    </g>
+
+    <!-- electronics tray -->
+    <path d="M455 545 L735 545 L760 620 L430 620 Z" fill="#eef1f2"/>
+    <rect x="468" y="552" width="105" height="48" fill="#b7bec4"/>
+    <rect x="482" y="560" width="42" height="26" fill="#263342"/>
+    <rect x="530" y="558" width="26" height="31" fill="#244e7a"/>
+    <rect x="605" y="555" width="65" height="45" fill="#d6d9dc"/>
+    <rect x="616" y="562" width="18" height="24" fill="#2d8a72"/>
+    <rect x="642" y="561" width="18" height="25" fill="#3f7fb1"/>
+    <rect x="687" y="548" width="46" height="50" fill="#9ea5aa"/>
+
+    <!-- motor bodies -->
+    <g>
+      <rect x="438" y="590" width="76" height="88" rx="8" fill="#141518"/>
+      <rect x="692" y="590" width="76" height="88" rx="8" fill="#141518"/>
+      <circle cx="494" cy="628" r="24" fill="#b7b9b9"/>
+      <circle cx="712" cy="628" r="24" fill="#b7b9b9"/>
+    </g>
+
+    <!-- left wheel -->
+    <g transform="translate(433 625)">
+      <circle cx="0" cy="0" r="63" fill="#171719"/>
+      <circle cx="0" cy="0" r="42" fill="#2f3236"/>
+      <circle cx="0" cy="0" r="27" fill="#d8dde0"/>
+      <circle cx="0" cy="0" r="9" fill="#141518"/>
+      <g stroke="#54585d" stroke-width="8">
+        <path d="M-20 -55 L-14 -42"/>
+        <path d="M17 -57 L13 -43"/>
+        <path d="M46 -36 L35 -27"/>
+        <path d="M58 -3 L43 -2"/>
+        <path d="M49 33 L36 25"/>
+        <path d="M20 55 L14 42"/>
+        <path d="M-18 56 L-14 42"/>
+        <path d="M-48 34 L-36 25"/>
+        <path d="M-58 1 L-43 0"/>
+        <path d="M-47 -35 L-35 -27"/>
+      </g>
+    </g>
+
+    <!-- right wheel -->
+    <g transform="translate(771 625)">
+      <circle cx="0" cy="0" r="63" fill="#171719"/>
+      <circle cx="0" cy="0" r="42" fill="#2f3236"/>
+      <circle cx="0" cy="0" r="27" fill="#d8dde0"/>
+      <circle cx="0" cy="0" r="9" fill="#141518"/>
+      <g stroke="#54585d" stroke-width="8">
+        <path d="M-20 -55 L-14 -42"/>
+        <path d="M17 -57 L13 -43"/>
+        <path d="M46 -36 L35 -27"/>
+        <path d="M58 -3 L43 -2"/>
+        <path d="M49 33 L36 25"/>
+        <path d="M20 55 L14 42"/>
+        <path d="M-18 56 L-14 42"/>
+        <path d="M-48 34 L-36 25"/>
+        <path d="M-58 1 L-43 0"/>
+        <path d="M-47 -35 L-35 -27"/>
+      </g>
+    </g>
+
+    <!-- front caster -->
+    <g transform="translate(563 665)">
+      <rect x="-12" y="-28" width="24" height="50" rx="6" fill="#555b61"/>
+      <circle cx="0" cy="35" r="22" fill="#202226"/>
+      <circle cx="0" cy="35" r="10" fill="#b7bec4"/>
+    </g>
+
+    <!-- small structural details -->
+    <g fill="#68717a" stroke-width="2">
+      <circle cx="420" cy="445" r="5"/>
+      <circle cx="784" cy="445" r="5"/>
+      <circle cx="475" cy="548" r="5"/>
+      <circle cx="730" cy="548" r="5"/>
+    </g>
+  </g>
+
+  <text x="586.5" y="770" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#555">
+    CAD-style robot model preview
+  </text>
+</svg>
