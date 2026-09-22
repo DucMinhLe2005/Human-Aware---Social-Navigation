@@ -2,11 +2,11 @@
 
 <table>
   <tr>
-    <td align="center" width="36%">
-      <img src="docs/images/social_nav_real.webp" width="100%" alt="Human-Aware Social Navigation real robot">
+    <td align="center" width="42%">
+      <img src="docs/images/social_nav_real.webp" height="360" alt="Human-Aware Social Navigation real robot">
     </td>
-    <td align="center" width="64%">
-      <img src="docs/images/robot_cad.webp" width="100%" alt="Human-Aware Social Navigation CAD model">
+    <td align="center" width="58%">
+      <img src="docs/images/social_nav_cad.svg" height="360" alt="Human-Aware Social Navigation CAD model">
     </td>
   </tr>
   <tr>
