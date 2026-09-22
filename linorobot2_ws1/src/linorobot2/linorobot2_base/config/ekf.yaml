@@ -1,6 +1,6 @@
 ekf_filter_node:
     ros__parameters:
-        frequency: 50.0
+        frequency: 20.0
         two_d_mode: true
         publish_tf: true
  
@@ -21,9 +21,24 @@ ekf_filter_node:
                        false, false, true,
                        false, false, false]
 
-        imu0: imu/data
-        imu0_config: [false, false, false,
-                      false, false, false,
-                      false, false, false,
-                      false, false, false,
-                      false, false, false]
+        # KHONG hop nhat IMU (quyet dinh cua nguoi dung 2026-09-16).
+        #
+        # Truoc do file nay khai bao imu0: imu/data voi o [11] (vyaw) = true, con
+        # ban dang chay tren NUC (xe that) thi tat han IMU tu dot commissioning
+        # 2026-09-07 -- tuc sim va xe that dang chay HAI mo hinh loc khac nhau.
+        # Nay thong nhat theo ban xe that: chi encoder banh, KHONG IMU.
+        #
+        # Ly do khong bat: gyro Z khi xe DUNG YEN van do ra khoang -0.24 rad/s.
+        # Do la lech chuan (bias), khong phai nhieu -- hop nhat vao se lam yaw cua
+        # odom tu quay du xe dung im, va AMCL phai gong sua lien tuc.
+        #
+        # Muon bat lai thi lam theo thu tu: (1) hieu chuan gyro, do lai bias khi
+        # dung yen phai ve gan 0; (2) them lai imu0 + imu0_config voi DUY NHAT o
+        # [11] (vyaw) = true; (3) do yaw troi tren quang duong that truoc khi tin.
+        # Khong khai bao imu0 ma de ca 15 o false -- robot_localization se in
+        # ERROR "listed as an input topic, but all its update variables are false"
+        # moi lan khoi dong ma chang loc them gi.
+        #
+        # Diem yeu con lai khi khong co IMU: xe tung truot banh (xem loi caster
+        # trong my_amr.urdf.xacro) ma encoder khong nhin thay truot, nen yaw van co
+        # the troi. Hien dua han vao AMCL de sua map->odom.

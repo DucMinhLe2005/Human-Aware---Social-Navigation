@@ -1,8 +1,9 @@
 # Human-Aware Social Navigation
 
 <p align="center">
-  <img src="docs/images/robot_real.webp" width="48%" alt="Real Human-Aware Social Navigation Robot"/>
-  <img src="docs/images/robot_cad.webp" width="48%" alt="CAD Model of Human-Aware Social Navigation Robot"/>
+  <img src="docs/images/social_nav_real.webp" height="420" alt="Human-Aware Social Navigation real robot"/>
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/social_nav_cad.webp" height="420" alt="Human-Aware Social Navigation CAD model"/>
 </p>
 
 <p align="center">
