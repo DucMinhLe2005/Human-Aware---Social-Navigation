@@ -1,13 +1,19 @@
 # Human-Aware Social Navigation
 
-<p align="center">
-  <img src="docs/images/social_nav_real.webp" width="49%" alt="Human-Aware Social Navigation real robot"/>
-  <img src="docs/images/social_nav_cad.webp" width="49%" alt="Human-Aware Social Navigation CAD model"/>
-</p>
-
-<p align="center">
-  <b>Real Robot</b> &nbsp;&nbsp;&nbsp;&nbsp; <b>CAD Model</b>
-</p>
+<table>
+  <tr>
+    <td align="center" width="36%">
+      <img src="docs/images/social_nav_real.webp" width="100%" alt="Human-Aware Social Navigation real robot">
+    </td>
+    <td align="center" width="64%">
+      <img src="docs/images/social_nav_cad.jpg" width="100%" alt="Human-Aware Social Navigation CAD model">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><b>Real Robot</b></td>
+    <td align="center"><b>CAD Model</b></td>
+  </tr>
+</table>
 
 A ROS 2 Jazzy research platform for **human-aware / socially-aware mobile robot navigation** on a real differential-drive robot. The project is built and calibrated on top of [linorobot2](https://github.com/linorobot/linorobot2) and [linorobot2_hardware](https://github.com/linorobot/linorobot2_hardware), then extended toward RGB-D human perception, persistent multi-human tracking, asymmetric social-space modeling, socially-aware global planning, predictive local navigation, and an independent physical safety layer.
 
