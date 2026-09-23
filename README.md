@@ -119,33 +119,13 @@ The key design principle is that the **global planner may consume a 2D social co
 
 ### 2.2 Human-aware extension
 
-```text
-D435 RGB-D ──> YOLO Pose ──> 3D humans ──┐
-                                         │
-RPLIDAR /scan ────────────────────────────┤
-                                         ▼
-                                Multi-human tracking
-                              Hungarian + Kalman filter
-                                         │
-                                         ▼
-                              /planning/tracked_humans
-                                /                    \
-                               /                      \
-                              ▼                        ▼
-                         AGHPM field          Predictive local planner
-                              │                        │
-                              ▼                        │
-                    socially-aware map/path ──────────┘
-                                       │
-                                       ▼
-                                  velocity command
-                                       │
-                                       ▼
-                              physical safety layer
-                                       │
-                                       ▼
-                                      robot
-```
+<p align="center">
+  <img src="docs/images/human_aware_pipeline.png" width="85%" alt="Human-Aware Social Navigation Pipeline">
+</p>
+
+<p align="center">
+  <b>Human-Aware Social Navigation Pipeline</b>
+</p>
 
 ---
 
