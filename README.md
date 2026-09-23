@@ -109,46 +109,13 @@ The key design principle is that the **global planner may consume a 2D social co
 
 ### 2.1 Base navigation architecture
 
-```text
-                    ┌──────────────────────┐
-                    │  Intel RealSense D435│
-                    └──────────┬───────────┘
-                               │ RGB / Depth
-                               │
-┌──────────────────┐           │
-│ RPLIDAR A1M8     │           │
-│ /scan            │           │
-└────────┬─────────┘           │
-         │                     │
-         ▼                     ▼
-┌──────────────────────────────────────────┐
-│               ROS 2 Jazzy                │
-│                                          │
-│ robot_state_publisher / TF               │
-│ robot_localization EKF                   │
-│ SLAM Toolbox / AMCL                      │
-│ Nav2                                     │
-└─────────────────────┬────────────────────┘
-                      │ /cmd_vel
-                      ▼
-             ┌──────────────────┐
-             │ micro-ROS Agent  │
-             └────────┬─────────┘
-                      │ serial
-                      ▼
-             ┌──────────────────┐
-             │ ESP32 NodeMCU-32S│
-             │ PID + kinematics │
-             └──────┬─────┬─────┘
-                    │     │
-             ┌──────▼┐   ┌▼───────────────┐
-             │BTS7960│   │Wheel encoders  │
-             │drivers│   │+ MPU9250       │
-             └───┬───┘   └───────────────┘
-                 │
-                 ▼
-              Motors
-```
+<p align="center">
+  <img src="docs/images/system_architecture.png" width="75%" alt="System Architecture">
+</p>
+
+<p align="center">
+  <b>System Architecture</b>
+</p>
 
 ### 2.2 Human-aware extension
 
