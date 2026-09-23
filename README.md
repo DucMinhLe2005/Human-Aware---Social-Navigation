@@ -93,59 +93,13 @@ Extend the base robot from conventional obstacle avoidance toward a system that 
 
 The intended final research architecture is:
 
-```text
-RGB image + aligned depth
-          │
-          ▼
-      YOLO Pose
-          │
-          ▼
-Robust RGB-D 3D human detections
-          │
-          ▼
-Hungarian data association
-          │
-          ▼
-   Kalman track manager
-          │
-          ├── persistent ID
-          ├── position
-          ├── velocity
-          ├── covariance
-          └── motion state
-          │
-          ▼
-Body orientation + motion heading
-          │
-          ▼
-Structured multi-human state list
-          │
-     ┌────┴────┐
-     ▼         ▼
-Group logic   Future prediction
-     └────┬────┘
-          ▼
-Uncertainty-/motion-aware AGHPM
-          │
-   ┌──────┴───────────────┐
-   ▼                      ▼
-2D social costmap   time-indexed human states
-   │                      │
-   ▼                      │
-Cost-Aware A*             │
-   │                      │
-   ▼                      │
-Global social path ───────┘
-          │
-          ▼
-Predictive Human-Aware DWA
-          │
-          ▼
-       v*, ω*
-          │
-          ▼
-        Robot
-```
+<p align="center">
+  <img src="docs/images/human_aware_navigation_pipeline.png" width="75%" alt="Human-Aware Navigation Pipeline">
+</p>
+
+<p align="center">
+  <b>Human-Aware Navigation Pipeline</b>
+</p>
 
 The key design principle is that the **global planner may consume a 2D social costmap, but the local planner should also receive structured tracked-human states** so it can compare predicted robot and human states at the same future timestamps.
 
