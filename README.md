@@ -6,7 +6,7 @@
       <img src="docs/images/social_nav_real.webp" height="360" alt="Human-Aware Social Navigation real robot">
     </td>
     <td align="center" width="58%">
-      <img src="docs/images/social_nav_cad.svg" height="360" alt="Human-Aware Social Navigation CAD model">
+      <img src="docs/images/social_nav_cad.png" height="360" alt="Human-Aware Social Navigation CAD model">
     </td>
   </tr>
   <tr>
