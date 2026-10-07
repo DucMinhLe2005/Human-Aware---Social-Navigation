@@ -1,0 +1,7 @@
+# Python packages required by social_nav (in addition to the ROS packages in /opt/ros/jazzy).
+# Versions known to work together.
+ultralytics==8.4.142
+onnxruntime==1.30.0
+opencv-python==4.10.0
+scipy==1.11.4
+numpy==1.26.4  # numpy 2.x breaks scipy.optimize on Ubuntu 24.04

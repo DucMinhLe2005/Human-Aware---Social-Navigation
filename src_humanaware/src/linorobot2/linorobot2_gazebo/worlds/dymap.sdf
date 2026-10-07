@@ -1,0 +1,467 @@
+<?xml version="1.0" ?>
+<!--
+  Social navigation test world (Gazebo Harmonic), based on the original dymap
+  layout: a building of 10 wall segments (~20 x 12.5 m) with a single ~2 m wide
+  doorway in the middle (between Wall_9 and Wall_11, x ~ 7.02). Two people stand
+  talking near the doorway on its west side, and one pedestrian walks back and
+  forth on its east side (x = 8.0, y 0.0 <-> 3.0) without crossing the doorway.
+
+  Wall, bookshelf and person poses come from the runtime <state> block of the
+  original world. Walls and bookshelves are plain boxes with flat materials;
+  the people use local model:// meshes.
+-->
+<sdf version="1.8">
+  <world name="dymap">
+
+    <gravity>0 0 -9.8</gravity>
+    <physics default="0" name="default_physics" type="ode">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>100</real_time_update_rate>
+    </physics>
+
+    <!-- Declare only these three plugins; also declaring gz-sim-sensors-system /
+         gz-sim-imu-system here crashes with "Scene already exists". -->
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands">
+    </plugin>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+    <!-- Project plugin: publishes the named ground-truth poses used by
+         social_nav_metrics (/world/dymap/pose/info loses entity names through the bridge). -->
+    <!-- Full lib...so file name: the short name would match the directory
+         lib/social_nav_gazebo/ (ros2 run scripts) first and fail. -->
+    <plugin filename="libsocial_nav_ground_truth.so" name="social_nav::GroundTruthPosePublisher1">
+      <topic>/social_nav/ground_truth</topic>
+      <update_rate>20</update_rate>
+      <model>my_amr</model>
+      <model>actor_collision_proxy</model>
+      <model>Nurse</model>
+      <model>Nurse_clone</model>
+    </plugin>
+
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==== my_map: 10 wall segments, world-absolute poses. The only doorway is
+         the gap between Wall_9 (y up to 2.986) and Wall_11 (y from 0.972) at
+         x ~ 7.02, ~2.0 m wide. ==== -->
+    <model name="my_map">
+      <static>true</static>
+
+      <link name="Wall_1">
+        <pose>6.2711 7.4346 0 0 0 0</pose>
+        <collision name="Wall_1_collision">
+          <geometry><box><size>20 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_1_visual">
+          <geometry><box><size>20 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_9">
+        <pose>7.00023 5.23577 0 0 0 -1.5708</pose>
+        <collision name="Wall_9_collision">
+          <geometry><box><size>4.5 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_9_visual">
+          <geometry><box><size>4.5 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_11">
+        <pose>7.04069 -0.902582 0 0 0 -1.5708</pose>
+        <collision name="Wall_11_collision">
+          <geometry><box><size>3.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_11_visual">
+          <geometry><box><size>3.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_13">
+        <pose>9.99395 1.91478 0 0 0 -1.5708</pose>
+        <collision name="Wall_13_collision">
+          <geometry><box><size>4.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_13_visual">
+          <geometry><box><size>4.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_15">
+        <pose>11.4594 1.90881 0 0 0 0</pose>
+        <collision name="Wall_15_collision">
+          <geometry><box><size>3 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_15_visual">
+          <geometry><box><size>3 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_17">
+        <pose>12.9877 1.91478 0 0 0 -1.5708</pose>
+        <collision name="Wall_17_collision">
+          <geometry><box><size>4.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_17_visual">
+          <geometry><box><size>4.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_2">
+        <pose>16.1961 1.2596 0 0 0 -1.5708</pose>
+        <collision name="Wall_2_collision">
+          <geometry><box><size>12.5 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_2_visual">
+          <geometry><box><size>12.5 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_3">
+        <pose>8.89611 -4.9154 0 0 0 3.14159</pose>
+        <collision name="Wall_3_collision">
+          <geometry><box><size>14.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_3_visual">
+          <geometry><box><size>14.75 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <!-- Wall_4: the building's oblique corner. -->
+      <link name="Wall_4">
+        <pose>-1.00252 -2.31678 0 0 0 2.35619</pose>
+        <collision name="Wall_4_collision">
+          <geometry><box><size>7.5 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_4_visual">
+          <geometry><box><size>7.5 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+      <link name="Wall_7">
+        <pose>-3.68411 3.85513 0 0 0 1.5708</pose>
+        <collision name="Wall_7_collision">
+          <geometry><box><size>7.25 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+        </collision>
+        <visual name="Wall_7_visual">
+          <geometry><box><size>7.25 0.15 2.5</size></box></geometry>
+          <pose>0 0 1.25 0 0 0</pose>
+          <material><ambient>0.7 0.7 0.7 1</ambient></material>
+        </visual>
+      </link>
+
+    </model>
+
+    <!-- ==== Two bookshelves (plain boxes). ==== -->
+    <model name="bookshelf">
+      <static>true</static>
+      <pose>2.95166 4.12219 0 0 0 0</pose>
+      <link name="link">
+        <collision name="back">
+          <pose>0 0.005 0.6 0 0 0</pose>
+          <geometry><box><size>0.9 0.01 1.2</size></box></geometry>
+        </collision>
+        <visual name="back_visual">
+          <pose>0 0.005 0.6 0 0 0</pose>
+          <geometry><box><size>0.9 0.01 1.2</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="left_side">
+          <pose>0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+        </collision>
+        <visual name="left_side_visual">
+          <pose>0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="right_side">
+          <pose>-0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+        </collision>
+        <visual name="right_side_visual">
+          <pose>-0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="bottom">
+          <pose>0 -0.195 0.03 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.06</size></box></geometry>
+        </collision>
+        <visual name="bottom_visual">
+          <pose>0 -0.195 0.03 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.06</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="top">
+          <pose>0 -0.195 1.19 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+        </collision>
+        <visual name="top_visual">
+          <pose>0 -0.195 1.19 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="low_shelf">
+          <pose>0 -0.195 0.43 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+        </collision>
+        <visual name="low_shelf_visual">
+          <pose>0 -0.195 0.43 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="high_shelf">
+          <pose>0 -0.195 0.8 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+        </collision>
+        <visual name="high_shelf_visual">
+          <pose>0 -0.195 0.8 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="bookshelf_0">
+      <static>true</static>
+      <pose>4.18585 -0.455827 0 0 0 0</pose>
+      <link name="link">
+        <collision name="back">
+          <pose>0 0.005 0.6 0 0 0</pose>
+          <geometry><box><size>0.9 0.01 1.2</size></box></geometry>
+        </collision>
+        <visual name="back_visual">
+          <pose>0 0.005 0.6 0 0 0</pose>
+          <geometry><box><size>0.9 0.01 1.2</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="left_side">
+          <pose>0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+        </collision>
+        <visual name="left_side_visual">
+          <pose>0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="right_side">
+          <pose>-0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+        </collision>
+        <visual name="right_side_visual">
+          <pose>-0.45 -0.195 0.6 0 0 0</pose>
+          <geometry><box><size>0.02 0.4 1.2</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="bottom">
+          <pose>0 -0.195 0.03 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.06</size></box></geometry>
+        </collision>
+        <visual name="bottom_visual">
+          <pose>0 -0.195 0.03 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.06</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="top">
+          <pose>0 -0.195 1.19 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+        </collision>
+        <visual name="top_visual">
+          <pose>0 -0.195 1.19 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="low_shelf">
+          <pose>0 -0.195 0.43 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+        </collision>
+        <visual name="low_shelf_visual">
+          <pose>0 -0.195 0.43 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+        <collision name="high_shelf">
+          <pose>0 -0.195 0.8 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+        </collision>
+        <visual name="high_shelf_visual">
+          <pose>0 -0.195 0.8 0 0 0</pose>
+          <geometry><box><size>0.88 0.4 0.02</size></box></geometry>
+          <material><ambient>0.45 0.32 0.18 1</ambient></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==== Two people standing and talking near the doorway (west side). ==== -->
+    <model name="Nurse">
+      <static>true</static>
+      <pose>5.4421 2.03288 0 0 0 -1.34594</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>model://nurse/meshes/Nurse.obj</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <mesh>
+              <uri>model://nurse/meshes/Nurse_Col.obj</uri>
+            </mesh>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <model name="Nurse_clone">
+      <static>true</static>
+      <pose>5.87329 0.870203 0 0 0 2.29178</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>model://nurse/meshes/Nurse.obj</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <mesh>
+              <uri>model://nurse/meshes/Nurse_Col.obj</uri>
+            </mesh>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ==== Pedestrian: x fixed at 8.0 (~1 m east of the doorway), y 0.0 <-> 3.0,
+         never crossing the doorway, with a 1 s stop and turn at each end. ==== -->
+    <actor name="actor">
+      <!-- Skin and animation: nursewalk (Luca/NurseFemaleWalk on Fuel), rigged and
+           textured. The untextured grey mannequin was rarely recognised by the
+           person detector. Its origin is at the FEET (z 0..1.61 m), so the
+           waypoints use z = 0.0. -->
+      <skin>
+        <filename>model://nursewalk/meshes/NurseFemaleWalk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walking">
+        <filename>model://nursewalk/meshes/NurseFemaleWalk.dae</filename>
+        <scale>1.0</scale>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <delay_start>0.0</delay_start>
+        <auto_start>true</auto_start>
+        <!-- Walking speed ~0.7 m/s (1 m / 1.4286 s), with a 1 s stop to turn around
+             at each end. -->
+        <trajectory id="0" type="walking">
+          <waypoint><time>0.0000</time><pose>8.0 4.0 0.0 0 0 -1.570796</pose></waypoint>
+          <waypoint><time>1.4286</time><pose>8.0 3.0 0.0 0 0 -1.570796</pose></waypoint>
+          <waypoint><time>2.8571</time><pose>8.0 2.0 0.0 0 0 -1.570796</pose></waypoint>
+          <waypoint><time>4.2857</time><pose>8.0 1.0 0.0 0 0 -1.570796</pose></waypoint>
+          <waypoint><time>5.7143</time><pose>8.0 0.0 0.0 0 0 -1.570796</pose></waypoint>
+          <waypoint><time>6.7143</time><pose>8.0 0.0 0.0 0 0 1.570796</pose></waypoint>
+          <waypoint><time>8.1429</time><pose>8.0 1.0 0.0 0 0 1.570796</pose></waypoint>
+          <waypoint><time>9.5714</time><pose>8.0 2.0 0.0 0 0 1.570796</pose></waypoint>
+          <waypoint><time>11.0000</time><pose>8.0 3.0 0.0 0 0 1.570796</pose></waypoint>
+          <waypoint><time>12.4286</time><pose>8.0 4.0 0.0 0 0 1.570796</pose></waypoint>
+          <waypoint><time>13.4286</time><pose>8.0 4.0 0.0 0 0 -1.570796</pose></waypoint>
+        </trajectory>
+      </script>
+    </actor>
+
+    <!-- Invisible collision proxy following the actor (radius 0.28, height 1.70),
+         moved by MovingCollisionProxyPlugin1; starts at the first waypoint. -->
+    <model name="actor_collision_proxy">
+      <static>true</static>
+      <pose>8.0 3.0 0.0 0 0 -1.570796</pose>
+      <link name="body">
+        <pose>0.0 0.0 0.85 0 0 0</pose>
+        <collision name="human_collision">
+          <geometry><cylinder><radius>0.28</radius><length>1.70</length></cylinder></geometry>
+        </collision>
+        <!-- No visual: a transparent visual is still hit by gpu_lidar, so lidar would
+             see two objects (actor and cylinder) for one person. The <collision>
+             is what physics uses for contacts. -->
+      </link>
+      <!-- Full lib...so file name: the short name "social_nav_gazebo" matches the
+           directory install/social_nav_gazebo/lib/social_nav_gazebo/ and fails. -->
+      <plugin filename="libsocial_nav_gazebo.so" name="social_nav::MovingCollisionProxyPlugin1">
+        <actor_name>actor</actor_name>
+      </plugin>
+    </model>
+
+  </world>
+</sdf>

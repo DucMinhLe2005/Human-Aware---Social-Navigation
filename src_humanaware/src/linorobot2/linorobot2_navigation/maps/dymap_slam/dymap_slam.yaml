@@ -1,0 +1,6 @@
+image: dymap_slam.pgm
+resolution: 0.05
+origin: [-3.975, -5.475, 0.0000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196

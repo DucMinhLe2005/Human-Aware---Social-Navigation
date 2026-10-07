@@ -1,0 +1,11 @@
+<class_libraries>
+  <library path="social_nav_costmap_layer">
+    <class type="social_nav_costmap_layer::AghpmLayer1" base_class_type="nav2_costmap_2d::Layer">
+      <description>
+        Asymmetric Gaussian Human Proxemics Model (AGHPM) social-cost layer.
+        Reads thesis_msgs/TrackedHumans and draws a soft (never lethal) cost zone
+        around each person that grows with walking speed and Kalman uncertainty.
+      </description>
+    </class>
+  </library>
+</class_libraries>

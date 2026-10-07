@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <actor name="nursewalk">
+    <skin>
+      <filename>model://nursewalk/meshes/NurseFemaleWalk.dae</filename>
+      <scale>1.0</scale>
+    </skin>
+    <animation name="walking">
+      <filename>model://nursewalk/meshes/NurseFemaleWalk.dae</filename>
+      <scale>1.0</scale>
+      <interpolate_x>true</interpolate_x>
+    </animation>
+  </actor>
+</sdf>

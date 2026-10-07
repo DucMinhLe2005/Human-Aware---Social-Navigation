@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- Dimensions and offsets taken from the real robot's original description. -->
+  <xacro:property name="base_length" value="0.27" />
+  <xacro:property name="base_width" value="0.24" />
+  <xacro:property name="base_height" value="0.05" />
+  <xacro:property name="base_mass" value="1.751285" />
+  <xacro:property name="base_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/base_link.STL" />
+
+  <xacro:property name="wheel_radius" value="0.05" />
+  <xacro:property name="wheel_width" value="0.032" />
+  <xacro:property name="wheel_pos_x" value="0.0" />
+  <xacro:property name="wheel_pos_y" value="0.1415" />
+  <!-- wheel_pos_z derived from base_footprint_joint z = 0.085 and the base macro
+       formula origin_z = wheel_radius - wheel_pos_z => wheel_pos_z = wheel_radius - 0.085 -->
+  <xacro:property name="wheel_pos_z" value="-0.035" />
+  <xacro:property name="wheel_mass" value="0.183802" />
+  <xacro:property name="wheel_torque" value="12.0" />
+  <xacro:property name="front_caster_wheel" value="true" />
+  <xacro:property name="rear_caster_wheel" value="true" />
+
+  <xacro:property name="wheel_left_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/wheel_left.STL" />
+  <xacro:property name="wheel_right_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/wheel_right.STL" />
+  <xacro:property name="caster_front_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/caster_front.STL" />
+  <xacro:property name="caster_rear_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/caster_rear.STL" />
+
+  <xacro:property name="imu_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/imu_link.STL" />
+  <xacro:property name="imu_xyz" value="0.091328 0.002047 0.017379" />
+
+  <xacro:property name="lidar_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/lidar_link.STL" />
+  <xacro:property name="laser_pose">
+    <origin xyz="-0.002108 0 0.2167" rpy="0 0 0"/>
+  </xacro:property>
+
+  <xacro:property name="camera_mesh_file" value="file://$(find linorobot2_description)/meshes/my_amr/camera_link.STL" />
+  <xacro:property name="depth_sensor_pose">
+    <origin xyz="0.011350 0.001871 0.438178" rpy="0 0 0"/>
+  </xacro:property>
+</robot>

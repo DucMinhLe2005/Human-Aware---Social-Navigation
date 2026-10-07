@@ -1,0 +1,32 @@
+ekf_filter_node:
+    ros__parameters:
+        frequency: 20.0
+        two_d_mode: true
+        publish_tf: true
+ 
+        map_frame: map             
+        odom_frame: odom            
+        base_link_frame: base_footprint 
+        world_frame: odom 
+
+        #x     , y     , z,
+        #roll  , pitch , yaw,
+        #vx    , vy    , vz,
+        #vroll , vpitch, vyaw,
+        #ax    , ay    , az
+        odom0: odom/unfiltered
+        odom0_config: [false, false, false,
+                       false, false, false,
+                       true, true, false,
+                       false, false, true,
+                       false, false, false]
+
+        # The IMU is NOT fused (encoders only), the same model in simulation and on
+        # the real robot. The real gyro reads about -0.24 rad/s around Z while the
+        # robot stands still -- a bias, not noise -- so fusing it would make the
+        # odometry yaw drift at rest. To enable it: (1) calibrate the gyro until
+        # the bias at rest is near zero; (2) add imu0 + imu0_config with ONLY
+        # index [11] (vyaw) true; (3) measure the yaw drift over a real run.
+        # Do not declare imu0 with all 15 entries false: robot_localization then
+        # logs an error at every start-up. Remaining weakness: encoders cannot see
+        # wheel slip, so yaw can still drift; AMCL corrects map->odom.

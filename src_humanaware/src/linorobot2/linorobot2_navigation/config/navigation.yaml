@@ -1,0 +1,551 @@
+amcl:
+  ros__parameters:
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_footprint"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    # Equal to the real sensor range (12 m, also the Gazebo gpu_lidar <max>), so
+    # AMCL classifies no-return beams as max-range readings and ignores them.
+    laser_max_range: 12.0
+    laser_min_range: -1.0
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    # Enable recovery: with 0.0 / 0.0 AMCL never injects random particles when the
+    # laser-map match is poor, so once it is lost it stays lost.
+    recovery_alpha_fast: 0.1
+    recovery_alpha_slow: 0.001
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    # Required in simulation: without an initial pose AMCL publishes no map->odom
+    # and Nav2 stays inactive.
+    set_initial_pose: true
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
+
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    action_server_result_timeout: 900.0
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    # 'default_nav_through_poses_bt_xml' and 'default_nav_to_pose_bt_xml' are use defaults:
+    # nav2_bt_navigator/navigate_to_pose_w_replanning_and_recovery.xml
+    # nav2_bt_navigator/navigate_through_poses_w_replanning_and_recovery.xml
+    # They can be set here or via a RewrittenYaml remap from a parent launch file to Nav2.
+
+    # plugin_lib_names is used to add custom BT plugins to the executor (vector of strings).
+    # Built-in plugins are added automatically
+    # plugin_lib_names: []
+
+    error_code_names:
+      - compute_path_error_code
+      - follow_path_error_code
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 20.0
+    costmap_update_timeout: 0.30
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
+    controller_plugins: ["FollowPath"]
+    use_realtime_priority: false
+
+    # Progress checker parameters
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+    # Goal checker parameters
+    #precise_goal_checker:
+    #  plugin: "nav2_controller::SimpleGoalChecker"
+    #  xy_goal_tolerance: 0.25
+    #  yaw_goal_tolerance: 0.25
+    #  stateful: True
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.35
+      yaw_goal_tolerance: 0.35
+    FollowPath:
+      plugin: "social_nav_controller::HumanAwareController1"
+      # 0.40 m/s in simulation and on the real robot (motor firmware limit ~0.415 m/s).
+      # Must match velocity_smoother.max_velocity[0] below.
+      max_linear_vel: 0.40
+      # Must equal escape_away_speed in lidar_safety_params.yaml.
+      min_linear_vel: -0.25
+      max_angular_vel: 1.0
+      # 7 x 9 = 63 candidates, sized for a dual-core CPU.
+      linear_samples: 7
+      angular_samples: 9
+      sim_time: 1.5
+      sim_dt: 0.1
+      lookahead_dist: 0.6
+      rotate_heading_deadband: 0.08
+      rotate_in_place_angle: 0.35
+
+      # Must be <= xy_goal_tolerance (0.35), otherwise the robot stops before it
+      # enters the goal radius and the goal never succeeds.
+      goal_approach_distance: 0.25
+      goal_yaw_deadband: 0.10      # < yaw_goal_tolerance 0.35
+      goal_yaw_gain: 1.5
+      goal_min_rotate_speed: 0.25  # overcomes wheel static friction
+      w_goal: 3.0
+      # Higher than a small speed weight so that driving faster still matters next to
+      # the human penalties.
+      w_speed: 1.0
+      w_path: 0.8
+      w_social: 5.0  # higher values made the robot circle around people
+      w_human_proximity: 6.0
+      # Moderate weight: stopping makes TTC infinite and removes the penalty, so a
+      # large weight would make standing still optimal whenever a person is near.
+      w_human_ttc: 3.0
+      w_heading: 1.0
+      w_smooth: 0.5
+      switch_score_margin: 0.3
+      robot_radius: 0.19  # used by the human risk model only (the costmap is already inflated)
+      # The Nav2 costmap is already inflated by the robot radius; sweeping a disc of
+      # robot_radius again would count it twice and block narrow passages. Keep 253
+      # and costmap_check_radius = 0.0 (point check).
+      collision_cost: 253
+      # 0.0 = point check (see collision_cost).
+      costmap_check_radius: 0.0
+      unknown_is_obstacle: true
+      predictive_humans_enabled: true
+      human_radius: 0.30
+      # rSocial = robot_radius + human_radius + margin = 0.19 + 0.30 + 0.50 = 0.99 m,
+      # i.e. the robot body stays 0.80 m from the person's centre = the edge of the
+      # social zone (human_cost_radius). Must match human_cost_radius: a larger rSocial
+      # makes the controller refuse paths the planner produces. rSocial is a soft
+      # zone; the hard limit is rHard = 0.19 + 0.30 + 0.05 = 0.54 m.
+      human_safety_margin: 0.50
+      human_hard_margin: 0.05
+      human_uncertainty_rate: 0.10
+      # Growth of the uncertainty radius with the person's speed:
+      # rate = max(rate, rate + factor * |v|), added directly to the hard limit.
+      # With factor 1.0 and a person walking at 0.7 m/s the veto radius grows from
+      # 0.54 to 1.74 m, wider than the social zone. 0.0 = disabled.
+      human_reversal_factor: 0.0
+      human_stationary_uncertainty_rate: 0.03
+      # Effective look-ahead of crossingGap() (not sim_time). The horizon also grows
+      # the uncertainty radius: veto radius at the end = 0.54 + 0.05 + 0.10 * horizon
+      # (0.99 m at 4.0 s).
+      human_prediction_horizon: 4.0
+      human_covariance_gain: 1.0
+      # The Kalman covariance is added directly to r_hard, so its cap bounds how much
+      # the hard limit can fluctuate with tracking quality.
+      human_covariance_sigma_cap: 0.050
+      tracked_humans_topic: "/planning/tracked_humans"
+      # /planning/tracked_humans averages 3.5 Hz with up to ~0.7 s jitter; a timeout
+      # at the nominal period would expire tracks spuriously.
+      tracked_humans_timeout: 0.8
+      # Stop (v = w = 0) when tracked-human data is missing or stale, instead of
+      # driving as if nobody were around.
+      require_tracked_humans: true
+      emergency_ttc_enter: 1.5
+      emergency_ttc_exit: 2.0
+      emergency_exit_hold: 0.5
+      emergency_clearance_improvement: 0.02
+      # Yield to people approaching from the side: score the perpendicular distance
+      # from the robot to the person's predicted path; every candidate that does not
+      # increase it is penalised, including standing still. Forward or backward is
+      # left to the scoring.
+      yield_enabled: true
+      yield_trigger_time: 4.0
+      # Equal to the edge of the social zone (= rSocial 0.99).
+      yield_clearance: 0.99
+      w_yield: 10.0
+      passing_enabled: true
+      stuck_escape_enabled: true
+
+      # Also the normaliser of the penalty: passingCost = 1 - |gap| / margin. Passing
+      # ahead of a person is rarely feasible, so a small margin avoids penalising
+      # good candidates.
+      pass_ahead_margin: 2.0
+      # Passing behind the person is the useful option in crossing scenarios.
+      pass_behind_margin: 1.0
+      w_passing: 8.0
+      intent_confidence_min: 0.6
+      intent_ema_alpha: 0.3
+      intent_min_speed: 0.15
+      intent_ttl: 2.0
+      emergency_clearance_tie_margin: 0.03
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      # 5 x 5 m rolling window (2.5 m around the robot), so the social zone of
+      # people tracked a few metres away is still drawn.
+      width: 5
+      height: 5
+      resolution: 0.05
+      # Round robot: the body has a 0.150 m radius and the outer wheel corner is at
+      # 0.163 m; the remaining margin comes from the inflation band (0.17 -> 0.30).
+      robot_radius: 0.17
+      # aghpm_social_layer sits BETWEEN voxel_layer and inflation_layer: the inflation
+      # layer must stay last. The social layer is used in both costmaps.
+      plugins: ["voxel_layer", "aghpm_social_layer", "inflation_layer"]
+      aghpm_social_layer:
+        plugin: "social_nav_costmap_layer::AghpmLayer1"
+        enabled: true
+        tracked_humans_topic: "/planning/tracked_humans"
+        max_human_distance: 10.0
+        max_cost_value: 220.0  # < INSCRIBED_INFLATED_OBSTACLE (253): never a hard obstacle
+        # Front sigma 0.38 m for a standing person; for a walking person
+        # 0.38 + 0.10 * speed (0.45 m at 0.7 m/s). human_cost_radius stays 0.8 so the
+        # cost fades out smoothly instead of ending in a cost wall.
+        sigma_front: 0.38
+        sigma_back: 0.30
+        sigma_side: 0.40  # do not raise to >= 0.5: the robot starts circling around people
+        # Social zone radius from the person's centre (walking: 0.8 + 0.10 * speed).
+        # Must match rSocial of FollowPath -- see human_safety_margin.
+        human_cost_radius: 0.8
+        velocity_social_enabled: true
+        velocity_sigma_front_gain: 0.10
+        # 0.0: no extra term for walking people (the speed term of
+        # velocity_sigma_front_gain already lengthens the front sigma).
+        moving_sigma_front_extra: 0.0
+        velocity_sigma_side_gain: 0.03
+        velocity_sigma_age_gain: 0.05
+        velocity_cost_radius_gain: 0.10
+        social_covariance_enabled: true
+        social_covariance_gain: 1.0
+        social_covariance_sigma_cap: 0.30
+        velocity_future_enabled: true
+        velocity_future_horizon: 1.25  # s, length of the predicted corridor
+        velocity_future_step: 0.2
+        velocity_future_cost_max: 0.45
+        velocity_future_decay_tau: 1.5
+        velocity_future_sigma_long: 0.30
+        velocity_future_sigma_side: 0.25
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        # cost = 252 * exp(-k * (d - inscribed_radius)), cut to 0 beyond inflation_radius.
+        # k = 10 makes wall cost fall below 76 from d >= 0.34, so people clearly dominate
+        # walls for the planner: avoiding people takes priority over centring in a corridor.
+        cost_scaling_factor: 10.0
+        # 0.30: larger values made narrow passages look blocked.
+        inflation_radius: 0.30
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        publish_voxel_map: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      # Round robot: the body has a 0.150 m radius and the outer wheel corner is at
+      # 0.163 m; the remaining margin comes from the inflation band (0.17 -> 0.30).
+      robot_radius: 0.17
+      resolution: 0.05
+      track_unknown_space: true
+      # The social layer is also added to the global costmap so the global planner
+      # routes around people from a distance. Same parameters as the local costmap.
+      plugins: ["static_layer", "obstacle_layer", "aghpm_social_layer", "inflation_layer"]
+      aghpm_social_layer:
+        plugin: "social_nav_costmap_layer::AghpmLayer1"
+        enabled: true
+        tracked_humans_topic: "/planning/tracked_humans"
+        max_human_distance: 10.0
+        max_cost_value: 220.0
+        # Same as the local costmap: front sigma 0.38 m (+ 0.10 * speed when walking),
+        # human_cost_radius 0.8 so the cost fades out smoothly.
+        sigma_front: 0.38
+        sigma_back: 0.30
+        sigma_side: 0.40
+        human_cost_radius: 0.8
+        velocity_social_enabled: true
+        velocity_sigma_front_gain: 0.10
+        # 0.0: no extra term for walking people (see the local costmap).
+        moving_sigma_front_extra: 0.0
+        velocity_sigma_side_gain: 0.03
+        velocity_sigma_age_gain: 0.05
+        velocity_cost_radius_gain: 0.10
+        social_covariance_enabled: true
+        social_covariance_gain: 1.0
+        social_covariance_sigma_cap: 0.30
+        velocity_future_enabled: true
+        velocity_future_horizon: 1.25
+        velocity_future_step: 0.2
+        velocity_future_cost_max: 0.45
+        velocity_future_decay_tau: 1.5
+        velocity_future_sigma_long: 0.30
+        velocity_future_sigma_side: 0.25
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        # cost = 252 * exp(-k * (d - inscribed_radius)), cut to 0 beyond inflation_radius;
+        # k = 10 makes people dominate walls for the planner.
+        cost_scaling_factor: 10.0
+        # 0.30: larger values made narrow passages look blocked.
+        inflation_radius: 0.30
+      always_send_full_costmap: True
+
+# The yaml_filename does not need to be specified since it going to be set by defaults in launch.
+# If you'd rather set it in the yaml, remove the default "map" value in the tb3_simulation_launch.py
+# file & provide full path to map below. If CLI map configuration or launch default is provided, that will be used.
+# map_server:
+#   ros__parameters:
+#     yaml_filename: ""
+
+map_saver:
+  ros__parameters:
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
+    costmap_update_timeout: 1.0
+    GridBased:
+      # NavFn A*. Smac 2D was compared in the same scenario and was slower, got stuck
+      # more often and kept less distance to people; the distance to people comes from
+      # inflation_radius and human_cost_radius, not from the planner.
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
+      use_astar: true
+      allow_unknown: true
+
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: True
+
+behavior_server:
+  ros__parameters:
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors::DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors::AssistedTeleop"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 20
+    stop_on_failure: false
+    action_server_result_timeout: 900.0
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200
+
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    # Must match FollowPath.max_linear_vel -- this is the hard limit; if it is not
+    # changed here the robot keeps the old speed whatever the controller plans.
+    max_velocity: [0.40, 0.0, 2.5]
+    min_velocity: [-0.25, 0.0, -2.5]  # must match FollowPath.min_linear_vel
+    max_accel: [2.5, 0.0, 3.2]
+    max_decel: [-2.5, 0.0, -3.2]
+    odom_topic: "odom"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
+
+collision_monitor:
+  ros__parameters:
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    # Publish to cmd_vel_raw so the lidar safety layer sits between the smoother and
+    # the robot.
+    cmd_vel_out_topic: "cmd_vel_raw"
+    state_topic: "collision_monitor_state"
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    # Polygons represent zone around the robot for "stop", "slowdown" and "limit" action types,
+    # and robot footprint for "approach" action type.
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 1.2
+      simulation_time_step: 0.1
+      min_points: 6
+      visualize: False
+      enabled: True
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "scan"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+
+docking_server:
+  ros__parameters:
+    controller_frequency: 50.0
+    initial_perception_timeout: 5.0
+    wait_charge_timeout: 5.0
+    dock_approach_timeout: 30.0
+    undock_linear_tolerance: 0.05
+    undock_angular_tolerance: 0.1
+    max_retries: 3
+    base_frame: "base_link"
+    fixed_frame: "odom"
+    dock_backwards: false
+    dock_prestaging_tolerance: 0.5
+
+    # Types of docks
+    dock_plugins: ['simple_charging_dock']
+    simple_charging_dock:
+      plugin: 'opennav_docking::SimpleChargingDock'
+      docking_threshold: 0.05
+      staging_x_offset: -0.7
+      use_external_detection_pose: true
+      use_battery_status: false # true
+      use_stall_detection: false # true
+
+      external_detection_timeout: 1.0
+      external_detection_translation_x: -0.18
+      external_detection_translation_y: 0.0
+      external_detection_rotation_roll: -1.57
+      external_detection_rotation_pitch: -1.57
+      external_detection_rotation_yaw: 0.0
+      filter_coef: 0.1
+
+    # Dock instances
+    # The following example illustrates configuring dock instances.
+    # docks: ['home_dock']  # Input your docks here
+    # home_dock:
+    #   type: 'simple_charging_dock'
+    #   frame: map
+    #   pose: [0.0, 0.0, 0.0]
+
+    controller:
+      k_phi: 3.0
+      k_delta: 2.0
+      v_linear_min: 0.15
+      v_linear_max: 0.15
+      use_collision_detection: true
+      costmap_topic: "local_costmap/costmap_raw"
+      footprint_topic: "local_costmap/published_footprint"
+      transform_tolerance: 0.1
+      projection_time: 5.0
+      simulation_step: 0.1
+      dock_collision_threshold: 0.3
+
+loopback_simulator:
+  ros__parameters:
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    map_frame_id: "map"
+    scan_frame_id: "base_scan"  # tb4_loopback_simulator.launch.py remaps to 'rplidar_link'
+    update_duration: 0.02

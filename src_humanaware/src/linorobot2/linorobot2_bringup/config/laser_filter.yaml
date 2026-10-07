@@ -1,0 +1,30 @@
+scan_to_scan_filter_chain:
+  ros__parameters:
+    filter1:
+      name: remove_left_bar
+      type: laser_filters/LaserScanAngularBoundsFilterInPlace
+      params:
+        lower_angle: 1.4835
+        upper_angle: 1.6581
+        replace_with_nan: true
+
+    filter2:
+      name: remove_right_bar
+      type: laser_filters/LaserScanAngularBoundsFilterInPlace
+      params:
+        lower_angle: -1.6581
+        upper_angle: -1.4835
+        replace_with_nan: true
+
+    # Drop beams hitting the robot body within 15 cm of the lidar. Keep in sync
+    # with filter3 in extra.launch.py -- the launch file is what actually runs;
+    # this file is kept for reference.
+    filter3:
+      name: remove_robot_body_range
+      type: laser_filters/LaserScanRangeFilter
+      params:
+        use_message_range_limits: false
+        lower_threshold: 0.15
+        upper_threshold: 100000.0
+        lower_replacement_value: .nan
+        upper_replacement_value: .nan

@@ -1,0 +1,10 @@
+<class_libraries>
+  <library path="social_nav_controller">
+    <class type="social_nav_controller::HumanAwareController1" base_class_type="nav2_core::Controller">
+      <description>
+        Human-aware DWA controller with separate hard / social risk radii and a
+        closed-form time-to-collision model, plus a hysteretic emergency mode.
+      </description>
+    </class>
+  </library>
+</class_libraries>

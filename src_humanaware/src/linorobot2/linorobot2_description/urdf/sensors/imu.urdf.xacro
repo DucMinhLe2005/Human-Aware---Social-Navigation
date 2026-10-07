@@ -1,0 +1,37 @@
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="imu" params="mesh_file:='' xyz:='0 0 0' rpy:='0 0 0'">
+    <link name="imu_link">
+      <xacro:unless value="${mesh_file == ''}">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="${mesh_file}" scale="1 1 1"/>
+          </geometry>
+          <material name="green">
+            <color rgba="0.15 0.55 0.2 1.0"/>
+          </material>
+        </visual>
+      </xacro:unless>
+    </link>
+
+    <joint name="imu_to_base_link" type="fixed">
+      <parent link="base_link"/>
+      <child link="imu_link"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <gazebo>
+      <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu">
+      </plugin>
+    </gazebo>
+
+    <gazebo reference="imu_link">
+      <sensor name="imu_sensor" type="imu">
+        <topic>imu/data</topic>
+        <update_rate>50</update_rate>
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+      </sensor>
+    </gazebo> 
+  </xacro:macro>
+</robot>

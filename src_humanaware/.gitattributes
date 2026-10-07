@@ -1,0 +1,2 @@
+# Keep these small Gazebo meshes as normal files (the repository root sends *.obj to Git LFS).
+*.obj -filter -diff -merge text

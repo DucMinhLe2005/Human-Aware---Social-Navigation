@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<robot name="my_amr" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="sim" default="false" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/my_amr_properties.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/mech/base.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/mech/wheel.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/mech/caster_wheel.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/sensors/plugins.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/sensors/imu.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/sensors/laser.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/sensors/depth_sensor.urdf.xacro" />
+  <xacro:include filename="$(find linorobot2_description)/urdf/controllers/diff_drive.urdf.xacro" />
+
+  <xacro:base
+    length="${base_length}"
+    width="${base_width}"
+    height="${base_height}"
+    mass="${base_mass}"
+    wheel_radius="${wheel_radius}"
+    wheel_pos_z="${wheel_pos_z}"
+    mesh_file="${base_mesh_file}"
+  />
+
+  <xacro:wheel
+    side="left"
+    radius="${wheel_radius}"
+    width="${wheel_width}"
+    pos_x="${wheel_pos_x}"
+    pos_y="${wheel_pos_y}"
+    pos_z="${wheel_pos_z}"
+    mass="${wheel_mass}"
+    mesh_file="${wheel_left_mesh_file}"
+  />
+
+  <xacro:wheel
+    side="right"
+    radius="${wheel_radius}"
+    width="${wheel_width}"
+    pos_x="${wheel_pos_x}"
+    pos_y="${-wheel_pos_y}"
+    pos_z="${wheel_pos_z}"
+    mass="${wheel_mass}"
+    mesh_file="${wheel_right_mesh_file}"
+  />
+
+  <!-- Caster position and radius from the real robot (xyz = +-0.119842 0 -0.085,
+       collision sphere radius 0.012). The original model offsets the collision
+       sphere 12 mm above the joint, so its bottom is level with the drive wheels
+       (wheel_pos_z -0.035 - wheel_radius 0.05 = -0.085). The caster_wheel macro
+       places the sphere centre at the joint, so the 12 mm is applied here:
+       -0.085 + 0.012 = -0.073. Without it the casters sit 12 mm below the wheels,
+       the drive wheels lose traction and the robot spins in place. -->
+  <xacro:if value="${front_caster_wheel}">
+    <xacro:caster_wheel
+      side="front"
+      mass="0.020117"
+      base_length="${base_length}"
+      wheel_radius="${wheel_radius}"
+      wheel_pos_z="${wheel_pos_z}"
+      mesh_file="${caster_front_mesh_file}"
+      pos_x_override="0.119842"
+      pos_z_override="-0.073"
+      radius_override="0.012"
+    />
+  </xacro:if>
+
+  <xacro:if value="${rear_caster_wheel}">
+    <xacro:caster_wheel
+      side="rear"
+      mass="0.020117"
+      base_length="${base_length}"
+      wheel_radius="${wheel_radius}"
+      wheel_pos_z="${wheel_pos_z}"
+      mesh_file="${caster_rear_mesh_file}"
+      pos_x_override="-0.119842"
+      pos_z_override="-0.073"
+      radius_override="0.012"
+    />
+  </xacro:if>
+
+  <xacro:imu mesh_file="${imu_mesh_file}" xyz="${imu_xyz}" />
+
+  <!-- min_range=0.15: the two camera mast posts stand 12-15 cm from the lidar on
+       each side; beams within 15 cm always hit them, not real obstacles. -->
+  <xacro:laser
+    update_rate="10"
+    ray_count="360"
+    min_angle="-3.1416"
+    max_angle="3.1416"
+    min_range="0.15"
+    max_range="12.0"
+    frame_id="lidar_link"
+    topic_name="scan"
+    mesh_file="${lidar_mesh_file}"
+  >
+    <xacro:insert_block name="laser_pose" />
+  </xacro:laser>
+
+  <xacro:depth_sensor mesh_file="${camera_mesh_file}">
+    <xacro:insert_block name="depth_sensor_pose" />
+  </xacro:depth_sensor>
+
+  <xacro:diff_drive_controller
+    wheel_separation="${wheel_pos_y * 2}"
+    wheel_radius="${wheel_radius}"
+  />
+</robot>

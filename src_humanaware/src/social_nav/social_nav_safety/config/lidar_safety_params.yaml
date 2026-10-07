@@ -1,0 +1,34 @@
+# Parameters of lidar_safety_node1 (shared by the Python and the C++ implementation).
+#
+# The distance thresholds are deliberately conservative (e.g. stop_distance 0.45 m)
+# to favour safety; only lower them with a concrete reason and a real-robot test.
+lidar_safety_node1:
+  ros__parameters:
+    control_rate: 20.0
+    scan_timeout: 0.25
+    cmd_timeout: 0.25
+    robot_front_extent: 0.18
+    front_half_width: 0.22
+    robot_rear_extent: 0.18
+    rear_half_width: 0.22
+    robot_safety_radius: 0.20
+    turn_slow_distance: 0.15
+    turn_stop_distance: 0.03
+    slow_distance: 0.80
+    stop_distance: 0.45
+    emergency_distance: 0.30
+    ttc_slow: 2.0
+    ttc_stop: 1.0
+    closing_speed_alpha: 0.35
+    max_closing_speed: 3.0
+    release_distance: 0.60
+    release_ttc: 1.50
+    release_hold_time: 0.30
+    escape_angular_speed: 0.3
+
+    # Escape while latched: when the forward direction is blocked by a person,
+    # allow the planner to back off (and vice versa) as long as that corridor is
+    # clear for at least release_distance. Disable with escape_away_enabled: false.
+    escape_away_enabled: true
+    # Keep equal to |min_linear_vel| of FollowPath in navigation.yaml.
+    escape_away_speed: 0.25

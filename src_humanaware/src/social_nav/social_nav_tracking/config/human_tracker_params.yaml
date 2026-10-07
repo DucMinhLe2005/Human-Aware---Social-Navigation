@@ -1,0 +1,79 @@
+# Deployed parameters of human_tracker_node1 (read by both the Python and the C++
+# implementation). Several values intentionally differ from the defaults in code.
+human_tracker_node1:
+  ros__parameters:
+    update_rate: 4.0
+    # Reversal handling: boost the velocity covariance when a measurement falls
+    # behind the prediction. boost = 1.0 disables it.
+    track_reversal_speed_threshold: 0.25
+    track_reversal_innovation_threshold: 0.10
+    track_reversal_covariance_boost: 1.0
+    lidar_observation_timeout: 0.40
+    # "Camera still fresh" window. The detector needs ~0.35 s per frame (up to
+    # ~0.87 s), so 1.0 s covers about 2.5 detector cycles; a shorter window would
+    # prevent the camera -> lidar handover and spawn duplicate tracks.
+    track_timeout: 1.0
+    track_coast_match_timeout: 2.0
+    # Hard limit for a coasting track; removes it even if lidar still sees the
+    # person. A safety net for people only briefly seen by the camera. To suppress
+    # ghost ids use max_frozen_publish_age instead of lowering this.
+    track_coast_timeout: 6.0
+    # Consecutive co-located camera + lidar ticks needed to confirm a person for good.
+    fusion_confirm_min_hits: 3
+    # The pedestrian stands still for ~1 s at each turning point, when its cluster
+    # becomes static and is rejected by lidar_static_rejection_radius; a shorter
+    # timeout makes the person return with a new id. Must be larger than
+    # lidar_only_min_duration, otherwise tracks die before they are confirmed.
+    lidar_only_track_timeout: 1.5
+    # Spatial person memory: a CONFIRMED track is remembered for ttl seconds after
+    # it dies, and a cluster reappearing inside the memory zone gets the old id back.
+    person_memory_ttl: 3.0
+    person_memory_radius_base: 0.5   # = track_lidar_coast_gate
+    person_memory_radius_max: 1.2
+    person_memory_growth_speed: 1.0  # m/s
+    # While lost, only WALKING people keep being published as ghosts
+    # (PREDICTION mode). 0.0 disables ghosts.
+    ghost_publish_min_speed: 0.3
+    # Also keep people who have STOPPED: someone who walks past the robot and
+    # stops to turn around would otherwise vanish and the robot would treat the
+    # space as free. Still bounded by person_memory_ttl.
+    ghost_publish_stationary: true
+
+    # Static exclusion zones, format [x y radius, x y radius, ...] in the map frame.
+    # Disabled by OMITTING the key -- do not write `lidar_static_exclusion_zones: []`:
+    # ROS 2 cannot infer the type of an empty list and the node fails at start-up.
+
+    # Allow lidar-only tracks when the camera does not see the person (blind
+    # spot, person facing away).
+    lidar_only_enabled: true
+    lidar_only_confirm_decay_sec: 3.0
+    lidar_only_association_gate: 0.70
+    lidar_only_moving_speed_threshold: 0.20
+
+    # Reject clusters lying on static map obstacles.
+    lidar_static_rejection_radius: 0.40
+    # Same check applied to the PUBLISHED position every tick (tracks can drift into walls).
+    publish_static_rejection_radius: 0.40
+    # Stop publishing a track whose last measurement is older than 2 s; its id stays
+    # in memory for re-association. Most ghost messages were tracks coasting on
+    # inertia, while real tracks are much fresher.
+    max_frozen_publish_age: 2.0
+    # 0.0 = do not merge leg clusters (merging can join two people standing close).
+    lidar_person_merge_distance: 0.0
+    # Lidar-only confirmation. lidar_only_min_duration (seconds) is used because a
+    # hit count depends on the tracker rate.
+    lidar_only_min_hits: 15
+    # Must be smaller than lidar_only_track_timeout (1.5), otherwise tracks die
+    # before confirmation and the tracker never publishes anyone.
+    lidar_only_min_duration: 1.0
+    # Once the camera confirmed a person, lidar may keep the track alive.
+    camera_vouched_lidar_hold: true
+    # Deduplicate published tracks: one real person could appear as several tracks.
+    publish_dedupe_distance: 0.8
+    # Reject torso keypoints far from the cluster (depth hitting the background).
+    torso_outlier_radius: 0.5
+
+    # Maximum gap between consecutive beams within one cluster.
+    lidar_person_cluster_max_gap: 0.15
+    # Minimum displacement before a lidar cluster is trusted as a PERSON.
+    lidar_only_min_displacement: 0.60

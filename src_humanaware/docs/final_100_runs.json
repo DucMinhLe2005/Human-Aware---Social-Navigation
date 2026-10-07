@@ -1,0 +1,16 @@
+{
+  "valid_runs": 100,
+  "clean_runs": 91,
+  "clean_rate": 0.91,
+  "clean_rate_ci95": [
+    0.8377362530335634,
+    0.9519280048361151
+  ],
+  "failed_runs": 9,
+  "collisions_total": 12,
+  "collisions_per_run": 0.12,
+  "walking_clearance_median_m": 0.56,
+  "walking_clearance_below_0_30_rate": 0.28,
+  "standing_people_collisions": 0,
+  "time_to_goal_median_s": 51.4
+}

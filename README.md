@@ -53,13 +53,16 @@ This is a snapshot of an ongoing project, so the table below separates what you 
 | Interactive calibration firmware (motor direction, encoder sign, CPR) | In this repository | `linorobot2_hardware/calibration/` |
 | Robot description, bringup, EKF, SLAM, AMCL, Nav2 baseline | In this repository | `linorobot2_ws1/src/linorobot2/` |
 | Launch integration for perception, tracking and the safety layer | In this repository | `linorobot2_bringup/launch/social_nav.launch.py`, `linorobot2_navigation/launch/navigation.launch.py` |
-| Human perception node (`social_nav_perception`) | Developed, not yet published here | separate workspace |
-| Multi-human tracker, Python and C++ (`social_nav_tracking`, `social_nav_tracking_cpp`) | Developed, not yet published here | separate workspace |
-| LiDAR safety node, Python and C++ (`social_nav_safety`, `social_nav_safety_cpp`) | Developed, not yet published here | separate workspace |
-| AGHPM social cost layer, social-cost-aware A*, predictive DWA | In development | separate workspace |
-| Closed-loop human-aware navigation experiments | Not yet run | see [Section 10](#10-roadmap-and-evaluation-plan) |
+| Human perception node (`social_nav_perception`) | In this repository | `src_humanaware/src/social_nav/` |
+| Multi-human tracker, Python and C++ (`social_nav_tracking`, `social_nav_tracking_cpp`) | In this repository | `src_humanaware/src/social_nav/` |
+| LiDAR safety node, Python and C++ (`social_nav_safety`, `social_nav_safety_cpp`) | In this repository | `src_humanaware/src/social_nav/` |
+| AGHPM social costmap layer (`social_nav_costmap_layer`) | In this repository | `src_humanaware/src/social_nav/` |
+| Human-aware DWA local controller (`social_nav_controller`) | In this repository | `src_humanaware/src/social_nav/` |
+| Gazebo scenario, metrics node and batch tools (`social_nav_gazebo`) | In this repository | `src_humanaware/src/social_nav/` |
+| Closed-loop evaluation in simulation (100 runs) | Done | [`src_humanaware/docs/RESULTS.md`](src_humanaware/docs/RESULTS.md) |
+| Closed-loop evaluation on the real robot | Not yet run | see [Section 10](#10-roadmap-and-evaluation-plan) |
 
-The directories `linorobot2_ws1/src/social_nav/` and `linorobot2_ws1/src/thesis_msgs/` are placeholders marked with `COLCON_IGNORE`.
+The repository holds two workspaces. `linorobot2_ws1/` is the real-robot base workspace; its `social_nav/` and `thesis_msgs/` directories are placeholders marked with `COLCON_IGNORE`. `src_humanaware/` is the simulation workspace with the complete human-aware stack; it has its own [README](src_humanaware/README.md) with build, run and batch-evaluation instructions.
 
 **Relationship to upstream.** The firmware and the base ROS 2 packages come from [linorobot2](https://github.com/linorobot/linorobot2) and [linorobot2_hardware](https://github.com/linorobot/linorobot2_hardware) (Apache-2.0). My work in this repository is the robot-specific hardware configuration and calibration, the changes to the PID and calibration firmware, the EKF and navigation launch changes, and the launch integration for the human-aware packages.
 
@@ -164,7 +167,22 @@ flowchart LR
 
 ## 6. Measured results
 
-Everything in this section was measured on the robot's own computer. There are no closed-loop navigation results yet; those are planned in [Section 10](#10-roadmap-and-evaluation-plan).
+The component benchmarks below were measured on the robot's own computer. The closed-loop results come from Gazebo; real-robot experiments are planned in [Section 10](#10-roadmap-and-evaluation-plan).
+
+### Closed-loop navigation in simulation
+
+The robot drives through a doorway past two standing people while a scripted pedestrian walks back and forth across its path at 0.7 m/s. The pedestrian does not react to the robot. Collisions and clearances are computed from ground-truth positions.
+
+| Metric (100 valid runs) | Value |
+|---|---|
+| Runs with no collision | 91 % (95 % CI 84 to 95 %) |
+| Collisions with standing people | 0 |
+| Collisions in total | 12, all with the walking pedestrian |
+| Minimum clearance to the pedestrian, median over runs | 0.56 m |
+| Runs with clearance below 0.30 m | 28 % |
+| Time to goal, median | 51.4 s |
+
+Every remaining collision happens when the pedestrian turns around close to the robot. The tracker's constant-velocity Kalman filter needs about 1.2 s to follow a reversal, and the camera often cannot see the person at that angle. Two batches of identical code differed by up to about 9 points in the no-collision rate, so that rate should be read with its confidence interval. The scenario, protocol and a variant that was evaluated and removed are in [`src_humanaware/docs/RESULTS.md`](src_humanaware/docs/RESULTS.md).
 
 ### Choosing a detector for a CPU-only robot
 
@@ -279,19 +297,19 @@ Raise the robot so the wheels are off the ground, then flash `linorobot2_hardwar
 
 ## 9. Known limitations of this snapshot
 
-- **The human-aware packages are not here yet.** The launch files reference them, but the source lives in a separate workspace. They will be published once the interfaces settle.
+- **The human-aware stack lives in the simulation workspace.** `src_humanaware/` contains the packages and a navigation configuration that uses them; the real-robot workspace `linorobot2_ws1/` has not been merged with it yet, so the points below still apply to `linorobot2_ws1/`.
 - **`navigation.yaml` is the baseline.** It contains no social cost layer, and the planner is NavFn with `use_astar: false`. Do not read it as the human-aware configuration.
 - **The safety chain is not yet consistent in this snapshot.** `navigation.launch.py` expects the Collision Monitor to output `cmd_vel_raw` so that the LiDAR safety node can publish the final `/cmd_vel`, but the checked-in YAML still outputs `cmd_vel`. This is why the run command above disables the safety node.
 - **The URDF wheel size lags the firmware.** The firmware uses the measured 0.09 m diameter, while `2wd_properties.urdf.xacro` still has a 0.04 m radius. This affects simulation, not the real robot's odometry.
 - **Only the stock maps are checked in** (`map`, `playground`, `turtlebot3_world`); the lab maps are not.
-- **No closed-loop human-aware results yet.** The measurements in Section 6 are component benchmarks.
+- **Closed-loop results are simulation only**, in one scenario with a scripted pedestrian. Simulation needs an NVIDIA GPU; see the workspace README.
 
 ---
 
 ## 10. Roadmap and evaluation plan
 
-1. Publish the perception, tracking and safety packages with their parameter files and tests.
-2. Integrate the AGHPM cost layer, the social-cost-aware A* planner and the predictive local planner, and make the velocity safety chain consistent.
+1. Merge the simulation workspace into the real-robot workspace so both run the same human-aware configuration.
+2. Bring the AGHPM costmap layer and the human-aware DWA onto the real robot, and make the velocity safety chain consistent there.
 3. Run the tracking-loss study in Gazebo with controlled occlusion: compare removing a lost person immediately, freezing the last position, propagating at constant velocity, and an adaptive strategy.
 4. Repeat the most informative scenarios on the real robot: a pedestrian crossing behind an obstacle, a head-on corridor encounter, and a person leaving and re-entering the camera view.
 

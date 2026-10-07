@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="caster_wheel" params="side mass base_length wheel_radius wheel_pos_z mesh_file:='' pos_x_override:='' pos_z_override:='' radius_override:=''">
+    <!-- Default: radius and position computed to fill the gap between base_link and
+         the ground. radius_override / pos_x_override / pos_z_override use measured
+         values instead of the formula. -->
+    <xacro:if value="${radius_override == ''}">
+      <xacro:property name="caster_wheel_radius" value="${(wheel_radius - wheel_pos_z) / 2}" />
+    </xacro:if>
+    <xacro:unless value="${radius_override == ''}">
+      <xacro:property name="caster_wheel_radius" value="${radius_override}" />
+    </xacro:unless>
+
+    <xacro:if value="${pos_x_override == ''}">
+      <xacro:if value="${side == 'front'}">
+          <xacro:property name="caster_wheel_x" value="${(base_length / 2) - caster_wheel_radius}" />
+      </xacro:if>
+      <xacro:if value="${side == 'rear'}">
+          <xacro:property name="caster_wheel_x" value="${-(base_length / 2) + caster_wheel_radius}" />
+      </xacro:if>
+    </xacro:if>
+    <xacro:unless value="${pos_x_override == ''}">
+      <xacro:property name="caster_wheel_x" value="${pos_x_override}" />
+    </xacro:unless>
+
+    <xacro:if value="${pos_z_override == ''}">
+      <xacro:property name="caster_wheel_z" value="${-caster_wheel_radius}" />
+    </xacro:if>
+    <xacro:unless value="${pos_z_override == ''}">
+      <xacro:property name="caster_wheel_z" value="${pos_z_override}" />
+    </xacro:unless>
+
+    <link name="${side}_caster_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <xacro:if value="${mesh_file == ''}">
+            <sphere radius="${caster_wheel_radius}" />
+          </xacro:if>
+          <xacro:unless value="${mesh_file == ''}">
+            <mesh filename="${mesh_file}" scale="1 1 1"/>
+          </xacro:unless>
+        </geometry>
+        <material name="black">
+            <color rgba="0.0 0.0 0.0 1.0"/>
+        </material>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${caster_wheel_radius}" />
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${mass}"/>
+        <inertia ixx="${(2/5) * mass * (caster_wheel_radius * caster_wheel_radius)}" ixy="0" ixz="0"
+                 iyy="${(2/5) * mass * (caster_wheel_radius * caster_wheel_radius)}" iyz="0"
+                 izz="${(2/5) * mass * (caster_wheel_radius * caster_wheel_radius)}" />
+      </inertial>
+    </link>
+
+    <gazebo reference="${side}_caster_wheel_link">
+        <mu1>0.01</mu1>
+        <mu2>0.01</mu2>
+    </gazebo>
+
+    <joint name="${side}_caster_wheel_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${side}_caster_wheel_link"/>
+      <origin xyz="${caster_wheel_x} 0 ${caster_wheel_z}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+</robot>

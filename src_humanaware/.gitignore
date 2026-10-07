@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Build output -- never commit
+build/
+install/
+log/
+
+# Batch results written by run_batch.sh (large: rosbags, logs)
+results/

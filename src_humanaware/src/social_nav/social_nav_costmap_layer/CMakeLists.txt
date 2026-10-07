@@ -1,0 +1,66 @@
+cmake_minimum_required(VERSION 3.8)
+project(social_nav_costmap_layer)
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(nav2_costmap_2d REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(thesis_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+
+add_library(${PROJECT_NAME} SHARED
+  src/aghpm_layer1.cpp
+)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
+  nav2_costmap_2d
+  pluginlib
+  thesis_msgs
+  tf2
+  tf2_ros
+)
+
+pluginlib_export_plugin_description_file(nav2_costmap_2d plugin.xml)
+
+install(
+  TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+install(
+  FILES plugin.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+if(BUILD_TESTING)
+  # No file in this workspace has a copyright header yet (a repository-wide
+  # decision), so the copyright checks are disabled; every other check stays on.
+  set(AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_copyright
+    ament_cmake_cpplint
+  )
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_cpplint REQUIRED)
+  ament_cpplint(FILTERS -legal/copyright)
+endif()
+
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_dependencies(rclcpp nav2_costmap_2d pluginlib thesis_msgs tf2 tf2_ros)
+
+ament_package()
