@@ -1,1447 +1,318 @@
-# Human-Aware Social Navigation
+# Human-Aware Social Navigation on a Real Mobile Robot
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="docs/images/social_nav_real.webp" height="360" alt="Human-Aware Social Navigation real robot">
-    </td>
-    <td align="center" width="50%">
-      <img src="docs/images/social_nav_cad.png" height="360" alt="Human-Aware Social Navigation CAD model">
-    </td>
-  </tr>
-  <tr>
-    <td align="center"><b>Real Robot</b></td>
-    <td align="center"><b>CAD Model</b></td>
-  </tr>
-</table>
+A ROS 2 Jazzy research platform for studying how a mobile robot should move around people. It is built on a custom differential-drive robot with a 2D LiDAR and an RGB-D camera, and all computation runs on a CPU-only onboard computer.
 
-A ROS 2 Jazzy research platform for **human-aware / socially-aware mobile robot navigation** on a real differential-drive robot. The project is built and calibrated on top of [linorobot2](https://github.com/linorobot/linorobot2) and [linorobot2_hardware](https://github.com/linorobot/linorobot2_hardware), then extended toward RGB-D human perception, persistent multi-human tracking, asymmetric social-space modeling, socially-aware global planning, predictive local navigation, and an independent physical safety layer.
+| <img src="docs/images/social_nav_real.webp" alt="The robot: differential-drive base, RPLIDAR A1M8 and RealSense D435 on a mast" height="380"> | <img src="docs/images/social_nav_cad.png" alt="CAD model of the robot" height="380"> |
+|:---:|:---:|
+| Real robot | CAD model |
 
-> **Upstream relationship.** The low-level robot controller, micro-ROS communication pattern, odometry, robot_localization, URDF/TF structure, SLAM Toolbox, AMCL, Nav2 bringup, RViz and Gazebo workflow originate from the Jazzy branch of linorobot2. This repository contains the robot-specific calibration, hardware configuration, launch changes, real-sensor integration, navigation tuning, and the Human-Aware / Social Navigation research extensions.
+**Author:** Le Duc Minh, Robotics-AI-BioMedical Laboratory, Hanoi University of Science and Technology
 
 ---
 
-## Table of Contents
+## Contents
 
-1. [Project Goals](#1-project-goals)
-2. [System Architecture](#2-system-architecture)
-3. [Verified Real-Robot Platform](#3-verified-real-robot-platform)
-4. [Repository Structure](#4-repository-structure)
-5. [Low-Level Firmware and Calibration](#5-low-level-firmware-and-calibration)
-6. [ESP32 Pin Mapping](#6-esp32-pin-mapping)
-7. [ROS 2 Base Stack](#7-ros-2-base-stack)
-8. [TF and Coordinate Frames](#8-tf-and-coordinate-frames)
-9. [RPLIDAR A1M8](#9-rplidar-a1m8)
-10. [Intel RealSense D435](#10-intel-realsense-d435)
-11. [Odometry and EKF](#11-odometry-and-ekf)
-12. [SLAM and Localization](#12-slam-and-localization)
-13. [Checked-In Nav2 Baseline](#13-checked-in-nav2-baseline)
-14. [Human-Aware Research Pipeline](#14-human-aware-research-pipeline)
-15. [RGB-D Human Perception](#15-rgb-d-human-perception)
-16. [Multi-Human Tracking](#16-multi-human-tracking)
-17. [Human State Representation](#17-human-state-representation)
-18. [AGHPM Social-Space Model](#18-aghpm-social-space-model)
-19. [Cost-Aware Global Planning](#19-cost-aware-global-planning)
-20. [Predictive Human-Aware Local Planning](#20-predictive-human-aware-local-planning)
-21. [Independent LiDAR Safety Layer](#21-independent-lidar-safety-layer)
-22. [Important ROS Topics](#22-important-ros-topics)
-23. [Build and Installation](#23-build-and-installation)
-24. [Real-Robot Bringup](#24-real-robot-bringup)
-25. [Mapping and Navigation Commands](#25-mapping-and-navigation-commands)
-26. [Human-Aware Launch Integration](#26-human-aware-launch-integration)
-27. [Calibration Procedure](#27-calibration-procedure)
-28. [Performance-Oriented Design Decisions](#28-performance-oriented-design-decisions)
-29. [Known Snapshot Caveats](#29-known-snapshot-caveats)
-30. [Evaluation Metrics](#30-evaluation-metrics)
-31. [Troubleshooting](#31-troubleshooting)
-32. [Credits and License](#32-credits-and-license)
+1. [What this project is](#1-what-this-project-is)
+2. [What is in this repository](#2-what-is-in-this-repository)
+3. [The robot](#3-the-robot)
+4. [System architecture](#4-system-architecture)
+5. [Human-aware pipeline](#5-human-aware-pipeline)
+6. [Measured results](#6-measured-results)
+7. [Calibration and commissioning notes](#7-calibration-and-commissioning-notes)
+8. [Build and run](#8-build-and-run)
+9. [Known limitations of this snapshot](#9-known-limitations-of-this-snapshot)
+10. [Roadmap and evaluation plan](#10-roadmap-and-evaluation-plan)
+11. [Credits and license](#11-credits-and-license)
 
 ---
 
-## 1. Project Goals
+## 1. What this project is
 
-The project has two layers:
+A conventional navigation stack treats a person as one more obstacle. This project works toward a robot that knows the difference: it detects and tracks the people around it, represents the space they would like kept clear, and plans with that information at both the route level and the velocity level.
 
-### 1.1 Real mobile-robot platform
+The project has two layers.
 
-Build a stable indoor navigation platform with:
+**Layer 1: a calibrated real-robot base.** Firmware, odometry, localization, mapping and a standard Nav2 baseline, all running on hardware I assembled and calibrated myself. This layer is complete and is what the code in this repository runs.
 
-- calibrated differential-drive kinematics;
-- encoder odometry;
-- ROS 2 Jazzy + micro-ROS;
-- RPLIDAR-based mapping and obstacle sensing;
-- RGB-D sensing with Intel RealSense D435;
-- SLAM Toolbox for mapping;
-- AMCL for localization;
-- Nav2 for autonomous navigation;
-- reproducible hardware/firmware configuration.
+**Layer 2: human-aware navigation research.** RGB-D human perception, multi-human tracking, an asymmetric personal-space model (AGHPM), a social-cost-aware global planner, a predictive local planner, and a LiDAR safety layer that does not depend on perception. This layer is under active development in a separate workspace. Section 2 states exactly which parts are public.
 
-### 1.2 Human-aware / social navigation research
+The research question the platform is being built to answer is narrow on purpose:
 
-Extend the base robot from conventional obstacle avoidance toward a system that can:
-
-- detect multiple people;
-- estimate 3D human positions from RGB-D;
-- maintain persistent IDs;
-- estimate velocity and uncertainty;
-- infer body orientation and motion heading;
-- model asymmetric personal/social space;
-- preserve social information during short observation gaps;
-- plan globally around social cost;
-- predict future robot-human interactions locally;
-- keep physical collision safety independent from semantic perception.
-
-The intended final research architecture is:
-
-<p align="center">
-  <img src="docs/images/human_aware_navigation_pipeline.png" width="75%" alt="Human-Aware Navigation Pipeline">
-</p>
-
-<p align="center">
-  <b>Human-Aware Navigation Pipeline</b>
-</p>
-
-The key design principle is that the **global planner may consume a 2D social costmap, but the local planner should also receive structured tracked-human states** so it can compare predicted robot and human states at the same future timestamps.
+> When a tracked person is briefly lost (occluded, outside the camera field of view, or missed by the detector), how should the robot keep, move and fade that person's social space so that it stays safe without becoming needlessly conservative?
 
 ---
 
-## 2. System Architecture
+## 2. What is in this repository
 
-### 2.1 Base navigation architecture
+This is a snapshot of an ongoing project, so the table below separates what you can clone and run from what is described but not yet published here.
 
-<p align="center">
-  <img src="docs/images/system_architecture.png" width="75%" alt="System Architecture">
-</p>
+| Component | Status | Where |
+|---|---|---|
+| ESP32 firmware (PID wheel control, odometry, IMU, micro-ROS) | In this repository | `linorobot2_hardware/` |
+| Robot-specific configuration and calibration values | In this repository | `linorobot2_hardware/config/custom/esp32_config.h` |
+| Interactive calibration firmware (motor direction, encoder sign, CPR) | In this repository | `linorobot2_hardware/calibration/` |
+| Robot description, bringup, EKF, SLAM, AMCL, Nav2 baseline | In this repository | `linorobot2_ws1/src/linorobot2/` |
+| Launch integration for perception, tracking and the safety layer | In this repository | `linorobot2_bringup/launch/social_nav.launch.py`, `linorobot2_navigation/launch/navigation.launch.py` |
+| Human perception node (`social_nav_perception`) | Developed, not yet published here | separate workspace |
+| Multi-human tracker, Python and C++ (`social_nav_tracking`, `social_nav_tracking_cpp`) | Developed, not yet published here | separate workspace |
+| LiDAR safety node, Python and C++ (`social_nav_safety`, `social_nav_safety_cpp`) | Developed, not yet published here | separate workspace |
+| AGHPM social cost layer, social-cost-aware A*, predictive DWA | In development | separate workspace |
+| Closed-loop human-aware navigation experiments | Not yet run | see [Section 10](#10-roadmap-and-evaluation-plan) |
 
-<p align="center">
-  <b>System Architecture</b>
-</p>
+The directories `linorobot2_ws1/src/social_nav/` and `linorobot2_ws1/src/thesis_msgs/` are placeholders marked with `COLCON_IGNORE`.
 
-### 2.2 Human-aware extension
-
-<p align="center">
-  <img src="docs/images/human_aware_pipeline.png" width="85%" alt="Human-Aware Social Navigation Pipeline">
-</p>
-
-<p align="center">
-  <b>Human-Aware Social Navigation Pipeline</b>
-</p>
+**Relationship to upstream.** The firmware and the base ROS 2 packages come from [linorobot2](https://github.com/linorobot/linorobot2) and [linorobot2_hardware](https://github.com/linorobot/linorobot2_hardware) (Apache-2.0). My work in this repository is the robot-specific hardware configuration and calibration, the changes to the PID and calibration firmware, the EKF and navigation launch changes, and the launch integration for the human-aware packages.
 
 ---
 
-## 3. Verified Real-Robot Platform
+## 3. The robot
 
-| Item | Real-robot configuration |
+| Item | Configuration |
 |---|---|
-| Drive | 2WD differential drive |
-| Robot computer | Intel NUC |
-| OS | Ubuntu 24.04 |
-| ROS | ROS 2 Jazzy |
-| MCU | ESP32 NodeMCU-32S |
+| Drive | Two-wheel differential drive with passive casters |
+| Onboard computer | Intel NUC (Core i3-6100U, no GPU), Ubuntu 24.04, ROS 2 Jazzy |
+| Microcontroller | ESP32 NodeMCU-32S, micro-ROS over serial at 921600 baud |
 | Motor drivers | 2 × BTS7960 |
-| Motors | 2 × DC geared motors with quadrature encoders |
-| IMU | MPU9250 |
+| Motors | 2 × 12 V DC gear motors with quadrature encoders |
+| IMU | MPU9250 on I²C at 400 kHz |
 | 2D LiDAR | RPLIDAR A1M8 |
-| RGB-D camera | Intel RealSense D435 |
-| MCU transport | micro-ROS serial |
-| MCU serial baud | 921600 |
-| Visualization | RViz from the NUC or another ROS 2 workstation over LAN |
+| RGB-D camera | Intel RealSense D435, 640 × 480 at 15 FPS |
 
-The real base configuration is defined in:
-
-```text
-linorobot2_hardware/config/custom/esp32_config.h
-```
-
-### Final measured calibration currently checked in
+Final measured values, as checked in to `esp32_config.h`:
 
 | Parameter | Value |
-|---|---:|
-| `LINO_BASE` | `DIFFERENTIAL_DRIVE` |
-| Motor driver | `USE_BTS7960_MOTOR_DRIVER` |
-| IMU | `USE_MPU9250_IMU` |
-| Motor max RPM | 110 RPM |
-| Maximum RPM ratio | 0.60 |
-| Motor operating voltage | 12 V |
-| Maximum motor supply voltage | 12 V |
-| Measured supply voltage | 11.7 V |
-| Encoder CPR, Motor 1 | 1799 |
-| Encoder CPR, Motor 2 | 1799 |
-| Wheel diameter | 0.09 m |
-| Left-right wheel distance | 0.30 m |
-| PID | Kp = 0.6, Ki = 0.8, Kd = 0.5 |
-| PWM resolution | 10 bit |
-| PWM frequency | 20 kHz |
-
-The encoder CPR was manually re-measured on **2026-09-17** from repeated readings around 1796–1802 counts/revolution and set to **1799**. The wheel diameter was also re-measured and updated to **0.09 m**.
-
----
-
-## 4. Repository Structure
-
-```text
-Human-Aware---Social-Navigation/
-│
-├── README.md
-├── docs/
-│   └── images/
-│       ├── social_nav_real.webp
-│       └── social_nav_cad.webp
-│
-├── linorobot2_hardware/
-│   ├── calibration/
-│   │   └── src/firmware.ino
-│   ├── config/
-│   │   ├── config.h
-│   │   └── custom/
-│   │       └── esp32_config.h
-│   ├── firmware/
-│   │   ├── lib/
-│   │   │   ├── encoder/
-│   │   │   ├── imu/
-│   │   │   ├── kinematics/
-│   │   │   ├── motor/
-│   │   │   ├── odometry/
-│   │   │   └── pid/
-│   │   ├── src/firmware.ino
-│   │   └── platformio.ini
-│   └── test_motors/
-│
-└── linorobot2_ws1/
-    └── src/
-        ├── linorobot2/
-        │   ├── linorobot2_base/
-        │   ├── linorobot2_bringup/
-        │   ├── linorobot2_description/
-        │   ├── linorobot2_gazebo/
-        │   └── linorobot2_navigation/
-        ├── linorobot2_viz/
-        ├── micro_ros_setup/
-        ├── uros/
-        ├── social_nav/
-        └── thesis_msgs/
-```
-
-Generated products are intentionally not versioned:
-
-```text
-build/
-install/
-log/
-.pio/
-__pycache__/
-```
-
----
-
-## 5. Low-Level Firmware and Calibration
-
-The low-level controller follows the linorobot2_hardware architecture.
-
-### 5.1 Command path
-
-```text
-/cmd_vel
-   │
-   ▼
-micro-ROS subscriber
-   │
-   ▼
-Differential-drive inverse kinematics
-   │
-   ▼
-left/right wheel target RPM
-   │
-   ▼
-PID wheel-speed control
-   │
-   ▼
-BTS7960 RPWM / LPWM
-   │
-   ▼
-DC motors
-```
-
-### 5.2 Feedback path
-
-```text
-quadrature encoders
-        │
-        ▼
-wheel angular velocity
-        │
-        ▼
-differential-drive forward kinematics
-        │
-        ▼
-/odom/unfiltered
-```
-
-The firmware also publishes IMU data from the MPU9250.
-
-### 5.3 Accelerometer correction
-
-The measured at-rest acceleration magnitude was approximately 10.68 m/s² rather than 9.81 m/s², therefore the checked-in configuration applies:
-
-```text
-9.81 / 10.68 = 0.918230
-```
-
-to all three accelerometer axes.
-
-### 5.4 Motor and encoder inversion
-
-The physical mounting requires both drive motors and both encoder signs to be inverted:
-
-```text
-MOTOR1_INV          = true
-MOTOR2_INV          = true
-MOTOR1_ENCODER_INV  = true
-MOTOR2_ENCODER_INV  = true
-```
-
----
-
-## 6. ESP32 Pin Mapping
-
-### Encoders
-
-| Signal | GPIO |
-|---|---:|
-| Motor 1 Encoder A | 18 |
-| Motor 1 Encoder B | 19 |
-| Motor 2 Encoder A | 16 |
-| Motor 2 Encoder B | 17 |
-
-### BTS7960 PWM/control
-
-| Driver signal | GPIO |
-|---|---:|
-| Motor 1 RPWM | 33 |
-| Motor 1 LPWM | 26 |
-| Motor 1 R_EN | 32 |
-| Motor 1 L_EN | 25 |
-| Motor 2 RPWM | 27 |
-| Motor 2 LPWM | 14 |
-| Motor 2 R_EN | 13 |
-| Motor 2 L_EN | 12 |
-
-### I²C
-
-| Signal | GPIO |
-|---|---:|
-| SDA | 21 |
-| SCL | 22 |
-
-The I²C bus is initialized at 400 kHz.
-
----
-
-## 7. ROS 2 Base Stack
-
-The robot keeps the standard linorobot2 ROS 2 organization:
-
-```text
-ESP32
- ├── /odom/unfiltered
- └── /imu/data
-        │
-        ▼
-robot_localization
-        │
-        ▼
-      /odom
-        │
-        ├── SLAM Toolbox
-        ├── AMCL
-        └── Nav2
-```
-
-Important upstream components:
-
-- **linorobot2_base** — EKF / base state estimation;
-- **linorobot2_description** — robot URDF and TF;
-- **linorobot2_bringup** — base, LiDAR, depth-camera and extra launch files;
-- **linorobot2_navigation** — SLAM, AMCL and Nav2;
-- **linorobot2_gazebo** — simulation;
-- **linorobot2_viz** — RViz visualization;
-- **micro_ros_setup / micro-ROS Agent** — ROS 2 ↔ MCU communication.
-
----
-
-## 8. TF and Coordinate Frames
-
-The expected navigation chain is:
-
-```text
-map
- └── odom
-      └── base_footprint
-           └── base_link
-                ├── laser
-                ├── imu_link
-                └── camera_link
-                     ├── camera color optical frame
-                     └── camera depth optical frame
-```
-
-Responsibility:
-
-- `map -> odom`: SLAM Toolbox or AMCL;
-- `odom -> base_footprint`: robot_localization;
-- `base_footprint -> base_link -> sensors`: robot_state_publisher / URDF.
-
-The checked-in 2WD URDF currently places:
-
-- LiDAR origin near `xyz="0.12 0 0.33"`;
-- depth-camera origin near `xyz="0.14 0 0.045"`.
-
-These are model values and must remain consistent with the physical mounting used during experiments.
-
----
-
-## 9. RPLIDAR A1M8
-
-The real robot uses an RPLIDAR A1 through `sllidar_ros2`.
-
-Typical device assignment:
-
-```text
-ESP32       -> /dev/ttyUSB0
-RPLIDAR A1  -> /dev/ttyUSB1
-symlink     -> /dev/rplidar
-```
-
-Create/update the symlink:
-
-```bash
-sudo ln -sfn /dev/ttyUSB1 /dev/rplidar
-```
-
-The linorobot2 laser launcher selects the A1 launch file when:
-
-```bash
-export LINOROBOT2_LASER_SENSOR=a1
-```
-
-The A1 launch uses:
-
-- serial device: `/dev/rplidar`;
-- nominal baud: 115200;
-- frame supplied by the linorobot2 launch stack.
-
-For the deployed robot, the navigation scan should be the **filtered scan**, not a scan containing robot-body returns.
-
----
-
-## 10. Intel RealSense D435
-
-The D435 provides RGB and depth for human perception.
-
-### Real-robot operating target
-
-```text
-RGB:   640 × 480 @ 15 FPS
-Depth: 640 × 480 @ 15 FPS
-```
-
-### Critical alignment rule
-
-YOLO keypoints are measured in RGB pixel coordinates. Therefore the depth value used for 3D back-projection must refer to the **same pixel geometry**.
-
-The social-navigation launch explicitly enables:
-
-```text
-align_depth.enable = true
-```
-
-and uses:
-
-```text
-/camera/aligned_depth_to_color/image_raw
-```
-
-for the real D435.
-
-This fixes a previously important failure mode: enabling depth alignment but accidentally reading `/camera/depth/image_rect_raw`, which is still in the original depth-camera geometry.
-
-### Namespace handling
-
-The custom launch removes the duplicated `/camera/camera/...` namespace by launching RealSense with an empty `camera_namespace`. This keeps simulation and hardware topics consistent around:
-
-```text
-/camera/color/image_raw
-/camera/color/camera_info
-/camera/aligned_depth_to_color/image_raw
-```
-
-### Initial hardware reset
-
-The D435 can be started with `initial_reset=true` to recover from USB/driver states where the ROS node exists but image frames are not actually published.
-
----
-
-## 11. Odometry and EKF
-
-Configuration:
-
-```text
-linorobot2_ws1/src/linorobot2/linorobot2_base/config/ekf.yaml
-```
-
-Current settings:
-
-- update frequency: 20 Hz;
-- `two_d_mode: true`;
-- publishes TF;
-- world frame: `odom`;
-- base frame: `base_footprint`;
-- input: `odom/unfiltered`.
-
-### Why IMU yaw is currently not fused
-
-The checked-in real-robot EKF intentionally does **not** fuse MPU9250 yaw/yaw-rate. During commissioning, a stationary gyro-Z reading around -0.24 rad/s caused false yaw motion when fused.
-
-The current policy is:
-
-1. use wheel odometry as the EKF motion input;
-2. let AMCL correct long-term `map -> odom` drift;
-3. only re-enable IMU yaw after gyro bias is calibrated close to zero and real driving tests show improved heading estimation.
-
----
-
-## 12. SLAM and Localization
-
-### Mapping
-
-The project uses **SLAM Toolbox** for 2D mapping from:
-
-- filtered LiDAR scan;
-- odometry;
-- TF.
-
-Conceptually:
-
-```text
-/scan + /odom + TF
-        │
-        ▼
-   SLAM Toolbox
-        │
-        ├── /map
-        └── map -> odom
-```
-
-### Localization
-
-For navigation on a saved occupancy grid, **AMCL** provides localization and publishes the `map -> odom` correction.
-
-The current Nav2 configuration uses:
-
-- `base_frame_id: base_footprint`;
-- `odom_frame_id: odom`;
-- `global_frame_id: map`;
-- `scan_topic: scan`;
-- differential motion model.
-
-The custom navigation launcher also writes the requested initial pose directly into a temporary Nav2 parameter file, because the Jazzy Nav2 bringup launch does not consume arbitrary `initial_pose_x/y/yaw` arguments by itself.
-
----
-
-## 13. Checked-In Nav2 Baseline
-
-The repository currently contains a conventional Nav2 baseline in:
-
-```text
-linorobot2_navigation/config/navigation.yaml
-```
-
-### Local controller
-
-The checked-in controller chain is:
-
-```text
-RotationShimController
-        │
-        ▼
-RegulatedPurePursuitController
-```
-
-Relevant baseline parameters include:
-
-| Parameter | Value |
-|---|---:|
-| Controller frequency | 20 Hz |
-| Desired linear velocity | 0.4 m/s |
-| Lookahead distance | 0.6 m |
-| XY goal tolerance | 0.35 m |
-| Yaw goal tolerance | 0.35 rad |
-| Local costmap size | 3 m × 3 m |
-| Costmap resolution | 0.05 m |
-| Robot radius in current YAML | 0.22 m |
-| Inflation radius | 0.70 m |
-
-### Global planner
-
-The checked-in baseline uses:
-
-```text
-nav2_navfn_planner::NavfnPlanner
-```
-
-with:
-
-```yaml
-use_astar: false
-```
-
-This baseline is useful as a conventional navigation reference. The Human-Aware research architecture described below extends beyond this baseline with social cost and predictive local behavior.
-
----
-
-## 14. Human-Aware Research Pipeline
-
-The project's research architecture should not be reduced to “YOLO + A* + DWA”. Its intended contributions are layered:
-
-1. robust multi-human state estimation;
-2. persistent association;
-3. uncertainty-aware and orientation-aware social representation;
-4. socially-aware global planning;
-5. time-aligned predictive local avoidance;
-6. physical safety separated from social comfort.
-
-The research pipeline is:
-
-```text
-YOLO Pose + RGB-D
-      ↓
-Robust human measurements
-      ↓
-Hungarian association
-      ↓
-Kalman tracking
-      ↓
-{ID, x, y, vx, vy, heading, covariance, confidence}
-      ↓
-group detection + future prediction
-      ↓
-AGHPM
-      ↓
-Cost-Aware A* global planning
-      ↓
-Predictive Human-Aware DWA
-      ↓
-physical safety checks
-      ↓
-robot
-```
-
----
-
-## 15. RGB-D Human Perception
-
-The perception design uses **pose**, not only a bounding box.
-
-Why pose matters:
-
-- body keypoints provide more stable localization cues than the bounding-box center;
-- body geometry provides orientation cues;
-- orientation is required for asymmetric personal space.
-
-### Robust 3D position estimation
-
-For a detected person, the preferred localization cue is the midpoint of stable body keypoints, especially the hips.
-
-For example:
-
-```text
-u_h = (u_left_hip + u_right_hip) / 2
-v_h = (v_left_hip + v_right_hip) / 2
-```
-
-Instead of using one noisy depth pixel, use the median depth in a small neighborhood:
-
-```text
-Z = median(depth patch around (u_h, v_h))
-```
-
-Then back-project using camera intrinsics:
-
-```text
-X = (u - cx) Z / fx
-Y = (v - cy) Z / fy
-Z = depth
-```
-
-Finally transform the point into a common tracking frame such as `odom`.
-
-Fallback keypoints can be used when the hips are unavailable, e.g. knees and then ankles.
-
----
-
-## 16. Multi-Human Tracking
-
-The intended tracker uses:
-
-- gated measurement association;
-- Hungarian assignment;
-- constant-velocity Kalman filtering;
-- persistent IDs;
-- track confirmation;
-- coasting during short observation gaps;
-- covariance propagation;
-- camera/LiDAR measurement support;
-- ID revival / short-term memory.
-
-A typical constant-velocity state is:
-
-```text
-x = [x, y, vx, vy]ᵀ
-```
-
-### Prediction
-
-```text
-x(k+1) = F x(k)
-```
-
-with process noise describing unmodeled human acceleration.
-
-### Measurement update
-
-RGB-D and LiDAR should be treated as measurements with their own uncertainty rather than directly averaged.
-
-The intended sequence is:
-
-```text
-camera detections ─┐
-                   ├─> association ─> matched track ─> KF update
-LiDAR observations ┘
-```
-
-### Why covariance is preserved
-
-Kalman covariance is not only a tracking-internal quantity. It can also inform:
-
-- association gating;
-- human-state confidence;
-- future prediction uncertainty;
-- social-space enlargement;
-- conservative local planning when a track becomes uncertain.
-
----
-
-## 17. Human State Representation
-
-For each tracked human `i`, the research state is conceptually:
-
-```text
-H_i = {
-  ID_i,
-  x_i, y_i,
-  vx_i, vy_i,
-  theta_i,
-  P_i,
-  confidence_i,
-  group_id_i
-}
-```
-
-where:
-
-- `ID` — persistent track identity;
-- `x, y` — position;
-- `vx, vy` — translational velocity;
-- `theta` — body orientation or selected social heading;
-- `P` — Kalman covariance;
-- `confidence` — perception/tracking reliability;
-- `group_id` — social group membership when available.
-
-The intended tracking output topic is:
-
-```text
-/planning/tracked_humans
-```
-
----
-
-## 18. AGHPM Social-Space Model
-
-AGHPM is the project's core social representation.
-
-The model is intended to be:
-
-- asymmetric;
-- orientation-aware;
-- motion-adaptive;
-- uncertainty-aware;
-- group-aware;
-- predictive.
-
-### 18.1 Asymmetric personal space
-
-A person's front, side and rear regions should not have identical cost.
-
-Conceptually:
-
-```text
-             larger frontal space
-                    ↑
-             . . . . . . .
-          .               .
-        .       human       .
-          .               .
-             . . . . .
-                    ↓
-              smaller rear
-```
-
-The current social-navigation launch comments reference a front/rear asymmetry around:
-
-```text
-sigma_front ≈ 0.50 m
-sigma_back  ≈ 0.30 m
-```
-
-These are project tuning values, not universal social-distance constants.
-
-### 18.2 Motion and body orientation
-
-Maintain two cues:
-
-- **body orientation** from pose;
-- **motion heading** from velocity.
-
-A stationary person can still have a meaningful facing direction even when velocity is near zero.
-
-### 18.3 Uncertainty-aware field
-
-A conceptual extension is:
-
-```text
-sigma_eff = sigma_AGHPM + k * sqrt(P_xx + P_yy)
-```
-
-so the social field expands as state uncertainty increases.
-
-### 18.4 Future social field
-
-For predicted future position:
-
-```text
-p_i(t + tau) = p_i(t) + v_i * tau
-```
-
-AGHPM can be extended from a single spatial field:
-
-```text
-C(x, y)
-```
-
-to a time-indexed field:
-
-```text
-C(x, y, t)
-```
-
-A velocity-elongated Gaussian alone should not be treated as equivalent to explicit future trajectory prediction.
-
----
-
-## 19. Cost-Aware Global Planning
-
-The intended global planner combines occupancy cost and social cost.
-
-Conceptually:
-
-```text
-J_global =
-    map obstacle cost
-  + inflation cost
-  + AGHPM social cost
-```
-
-A Cost-Aware A* planner can therefore choose a slightly longer path if it significantly reduces social-space intrusion.
-
-The role of the global planner is not to predict detailed short-term encounters at controller frequency. Its role is to shape the route at a larger scale.
-
----
-
-## 20. Predictive Human-Aware Local Planning
-
-The local planner should evaluate candidate robot trajectories against **future human states at matching timestamps**.
-
-A generic candidate score can include:
-
-```text
-J =
-  w_goal      * goal_progress
-+ w_path      * path_tracking
-+ w_speed     * speed_preference
-+ w_social    * social_field_cost
-+ w_human     * human_distance_risk
-+ w_ttc       * time_to_collision_risk
-+ w_heading   * heading_alignment
-+ w_smooth    * command_smoothness
-```
-
-For each candidate robot trajectory:
-
-```text
-robot(t0), robot(t1), ..., robot(tN)
-```
-
-compare it with predicted human states:
-
-```text
-human_i(t0), human_i(t1), ..., human_i(tN)
-```
-
-rather than evaluating the entire trajectory against only a static 2D human position.
-
-Physical admissibility and braking constraints should be applied before or alongside social scoring.
-
----
-
-## 21. Independent LiDAR Safety Layer
-
-Social navigation and physical collision safety should remain separate.
-
-The intended safety structure is:
-
-```text
-planner/controller
-       │
-       ▼
-velocity smoothing
-       │
-       ▼
-Nav2 Collision Monitor
-       │
-       ▼
-custom LiDAR stop/slow/TTC guard
-       │
-       ▼
-     /cmd_vel
-       │
-       ▼
-      ESP32
-```
-
-The safety layer should remain functional even if:
-
-- YOLO fails;
-- tracking is temporarily lost;
-- social-space estimation is wrong;
-- a person or object is not semantically recognized.
-
-The custom `navigation.launch.py` already contains integration hooks for Python/C++ implementations of `lidar_safety_node1`.
-
----
-
-## 22. Important ROS Topics
-
-| Topic | Purpose |
 |---|---|
-| `/cmd_vel` | final base command |
-| `/odom/unfiltered` | wheel odometry from ESP32 |
-| `/odom` | EKF output |
-| `/imu/data` | MPU9250 data |
-| `/scan` | navigation LiDAR scan |
-| `/camera/color/image_raw` | RGB stream |
-| `/camera/color/camera_info` | RGB camera intrinsics |
-| `/camera/aligned_depth_to_color/image_raw` | depth aligned to RGB |
-| `/planning/tracked_humans` | intended structured tracked-human output |
-| `/map` | occupancy grid |
-| `/tf`, `/tf_static` | transform tree |
+| Encoder counts per wheel revolution | 1799 (both wheels) |
+| Wheel diameter | 0.09 m |
+| Wheel separation | 0.30 m |
+| Motor rated speed, allowed fraction | 110 RPM, 0.60 |
+| Supply voltage, measured | 11.7 V |
+| Wheel-speed PID | Kp 0.6, Ki 0.8, Kd 0.5 |
+| PWM | 10 bit, 20 kHz |
 
-Useful diagnostics:
+<details>
+<summary>ESP32 pin mapping</summary>
 
-```bash
-ros2 topic list
-ros2 topic hz /odom
-ros2 topic hz /scan
-ros2 topic hz /camera/color/image_raw
-ros2 topic echo /odom --once
-ros2 run tf2_ros tf2_echo odom base_footprint
+| Signal | GPIO | Signal | GPIO |
+|---|---|---|---|
+| Motor 1 encoder A / B | 18 / 19 | Motor 2 encoder A / B | 16 / 17 |
+| Motor 1 RPWM / LPWM | 33 / 26 | Motor 2 RPWM / LPWM | 27 / 14 |
+| Motor 1 R_EN / L_EN | 32 / 25 | Motor 2 R_EN / L_EN | 13 / 12 |
+| I²C SDA / SCL | 21 / 22 | | |
+
+Both motors and both encoders are inverted in the configuration to match how they are mounted.
+
+</details>
+
+---
+
+## 4. System architecture
+
+<p align="center">
+  <img src="docs/images/system_architecture.png" alt="Sensors feed the ROS 2 stack on the NUC, which commands the ESP32 through the micro-ROS agent" width="520">
+</p>
+
+The ESP32 closes the wheel-speed loop at 50 Hz and publishes wheel odometry (`/odom/unfiltered`) and IMU data (`/imu/data`). On the NUC, `robot_localization` produces `/odom`, SLAM Toolbox builds maps, AMCL localizes on a saved map, and Nav2 plans and controls.
+
+**Frames**
+
+```
+map ── odom ── base_footprint ── base_link ──┬── laser
+                                             ├── imu_link
+                                             └── camera_link
+```
+
+`map → odom` comes from SLAM Toolbox or AMCL, `odom → base_footprint` from the EKF, and the sensor frames from the URDF.
+
+**Nav2 baseline checked in** (`linorobot2_navigation/config/navigation.yaml`)
+
+| Item | Setting |
+|---|---|
+| Global planner | NavFn (Dijkstra) |
+| Local controller | Rotation Shim + Regulated Pure Pursuit, 20 Hz, 0.4 m/s |
+| Local costmap | 3 m × 3 m rolling window, 0.05 m cells, voxel + inflation layers |
+| Robot radius, inflation radius | 0.22 m, 0.70 m |
+| Localization | AMCL, likelihood-field model, 500 to 2000 particles |
+| Safety | Nav2 Collision Monitor, footprint approach |
+
+This baseline is the reference that the human-aware planners will be compared against.
+
+---
+
+## 5. Human-aware pipeline
+
+<p align="center">
+  <img src="docs/images/human_aware_pipeline.png" alt="RGB-D and LiDAR feed pose detection and tracking; tracked humans feed the social-space model and the predictive local planner; a physical safety layer sits before the robot" width="760">
+</p>
+
+**Perception.** A YOLO pose model runs on the color image. For each person, the midpoint of the hip keypoints is back-projected through the depth image aligned to color, which gives a 3D position, and the body keypoints give a facing direction. Pose is used instead of bounding boxes because the facing direction is what makes the personal-space model asymmetric. Detection runs every 0.3 s to leave CPU headroom for navigation.
+
+**Tracking.** Detections are associated to tracks with the Hungarian algorithm and filtered with a constant-velocity Kalman filter. Each track carries a persistent ID, position, velocity, heading, covariance and confidence, and is published on `/planning/tracked_humans`. Camera and LiDAR observations are both used as measurements.
+
+**Social-space model (AGHPM).** Personal space is modelled as an asymmetric Gaussian aligned with the person's heading: wider in front than behind. The current tuning is σ<sub>front</sub> = 0.50 m and σ<sub>back</sub> = 0.30 m. These are project tuning values, not universal constants. Planned extensions make the field grow with tracking uncertainty and shift with predicted motion.
+
+**Planning.** The global planner adds social cost to obstacle cost, so a slightly longer route is accepted when it avoids cutting through someone's space. The local planner scores each candidate trajectory against where each person is predicted to be at the same instant, instead of against a static costmap.
+
+**Safety.** Collision safety is deliberately kept independent of perception. The velocity command passes through the Nav2 Collision Monitor and then a LiDAR-only stop/slow node before it reaches the motors, so the robot still stops if detection or tracking fails.
+
+```mermaid
+flowchart LR
+    A[Controller] --> B[Velocity smoother] --> C[Nav2 Collision Monitor] --> D[LiDAR safety node] --> E["/cmd_vel"] --> F[ESP32]
 ```
 
 ---
 
-## 23. Build and Installation
+## 6. Measured results
 
-### 23.1 ROS 2
+Everything in this section was measured on the robot's own computer. There are no closed-loop navigation results yet; those are planned in [Section 10](#10-roadmap-and-evaluation-plan).
 
-Use Ubuntu 24.04 with ROS 2 Jazzy.
+### Choosing a detector for a CPU-only robot
 
-The upstream linorobot2 installer and documentation are available at:
+<p align="center">
+  <img src="docs/images/benchmark_detector_latency.png" alt="Bar chart of inference time for six detector and runtime variants, from 25.9 ms to 71.5 ms" width="760">
+</p>
 
-- <https://github.com/linorobot/linorobot2>
-- <https://linorobot.github.io/linorobot2/>
+Three findings shaped the design:
 
-### 23.2 Clone this repository
+- **The INT8 model was the slowest, not the fastest.** It ran 2.8 times slower than the FP32 model in the same runtime. Two things combined: it had been exported at 640 × 640, about five times the pixels of the 256 × 320 exports, and the i3-6100U has AVX2 but no VNNI, so INT8 arithmetic is emulated.
+- **Dropping pose estimation saves nothing here.** The boxes-only YOLOv8n (37.1 ms) was slower than YOLO26n-pose with full keypoints (33.3 ms), so there is no speed argument for giving up the facing direction.
+- **OpenVINO FP32 is the fastest option measured** (25.9 ms). The pipeline currently uses the ONNX export at 33.3 ms.
+
+### Python versus C++ nodes
+
+<p align="center">
+  <img src="docs/images/benchmark_python_vs_cpp.png" alt="Tracker CPU load 99.3 percent in Python and 0.9 percent in C++; cycles published 40 and 100 of 100; safety node CPU 3.3 and 1.0 percent" width="820">
+</p>
+
+The Python tracker saturated one core and published only 40 of 100 update cycles in a 25 s real-time scenario. The C++ port uses 0.9 % of a core and publishes all 100, so it is the default (`tracker_impl:=cpp`). For the safety node the gap is small, 3.3 % against 1.0 %. Both implementations of each node share one parameter file, and the C++ safety node is checked step by step against a recorded trace from the Python version.
+
+---
+
+## 7. Calibration and commissioning notes
+
+These are the problems that had to be solved before the robot behaved the same in simulation and in the lab.
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Odometry distance was wrong | Encoder CPR and wheel diameter were nominal values | Re-measured by hand over repeated turns: CPR 2125 → 1799, wheel diameter 0.08 → 0.09 m |
+| Accelerometer read 10.68 m/s² at rest | Sensor scale error | All three axes scaled by 9.81 / 10.68 = 0.918 in firmware |
+| Robot rotated in RViz while standing still | Gyro Z bias of about −0.24 rad/s was fused into heading | IMU yaw removed from the EKF; wheel odometry drives the EKF and AMCL corrects long-term drift |
+| People were placed at the wrong 3D position on the real robot only | Depth alignment was enabled, but the node still read the unaligned depth topic | Real robot reads `aligned_depth_to_color`; simulation keeps the single depth topic |
+| Tracker could not transform LiDAR data in Gazebo | Nodes used wall-clock time while TF was stamped in simulated time | `sim` launch argument passes `use_sim_time` to every perception and tracking node |
+| Camera node alive but no frames after an unclean shutdown | D435 left in a stuck USB state | Hardware reset at startup (`camera_reset:=true`), about 3 s extra |
+| Camera topics differed between simulation and hardware | RealSense nests its namespace as `/camera/camera/...` | Empty `camera_namespace`, so both use `/camera/...` |
+| AMCL never published `map → odom` | Jazzy Nav2 bringup ignores `initial_pose_*` launch arguments | Launcher writes the initial pose into a temporary copy of the parameter file |
+
+The IMU yaw will be fused again only after the gyro bias is calibrated out and driving tests show that it improves heading.
+
+---
+
+## 8. Build and run
+
+**Requirements:** Ubuntu 24.04, ROS 2 Jazzy, PlatformIO. See the [linorobot2 documentation](https://linorobot.github.io/linorobot2/) for the base installation.
+
+### Build
 
 ```bash
 git clone https://github.com/DucMinhLe2005/Human-Aware---Social-Navigation.git
-cd Human-Aware---Social-Navigation
-```
-
-### 23.3 Build the ROS 2 workspace
-
-```bash
-cd linorobot2_ws1
+cd Human-Aware---Social-Navigation/linorobot2_ws1
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
 
-### 23.4 Build ESP32 firmware
-
-Install PlatformIO first, then:
+### Flash the ESP32
 
 ```bash
 cd linorobot2_hardware/firmware
-pio run -e esp32
-```
-
-Upload:
-
-```bash
 pio run -e esp32 -t upload --upload-port /dev/ttyUSB0
 ```
 
-The PlatformIO configuration targets:
-
-- ESP32 NodeMCU-32S;
-- ROS 2 Jazzy micro-ROS;
-- serial transport;
-- 921600 baud.
-
----
-
-## 24. Real-Robot Bringup
-
-### 24.1 Prepare devices
+### Bring up the robot
 
 ```bash
-sudo chmod 666 /dev/ttyUSB0 /dev/ttyUSB1
-sudo ln -sfn /dev/ttyUSB1 /dev/rplidar
-```
-
-### 24.2 Environment
-
-```bash
-export ROS_DOMAIN_ID=0
-export FASTDDS_BUILTIN_TRANSPORTS=UDPv4
 export LINOROBOT2_BASE=2wd
 export LINOROBOT2_LASER_SENSOR=a1
+sudo ln -sfn /dev/ttyUSB1 /dev/rplidar     # RPLIDAR; the ESP32 is /dev/ttyUSB0
+
+ros2 launch linorobot2_bringup bringup.launch.py base_serial_port:=/dev/ttyUSB0
 ```
 
-If a specific map is selected by the custom navigation launcher:
+Check that `/odom`, `/imu/data` and `/scan` are publishing before going further.
 
-```bash
-export LINOROBOT2_MAP=<map_name>
-```
-
-### 24.3 Bring up the robot
-
-```bash
-cd linorobot2_ws1
-source install/setup.bash
-
-ros2 launch linorobot2_bringup bringup.launch.py \
-  base_serial_port:=/dev/ttyUSB0 \
-  extra:=true
-```
-
-The standard micro-ROS data path should expose at least:
-
-```text
-/cmd_vel
-/odom/unfiltered
-/imu/data
-```
-
-and the EKF should publish:
-
-```text
-/odom
-```
-
----
-
-## 25. Mapping and Navigation Commands
-
-### 25.1 Mapping
+### Map
 
 ```bash
 ros2 launch linorobot2_navigation slam.launch.py
-```
-
-Drive the robot using teleoperation:
-
-```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
+ros2 run nav2_map_server map_saver_cli -f <map_name> --ros-args -p save_map_timeout:=10000.
 ```
 
-Save a map:
-
-```bash
-ros2 run nav2_map_server map_saver_cli -f <map_name> \
-  --ros-args -p save_map_timeout:=10000.
-```
-
-### 25.2 Navigation
+### Navigate with the baseline
 
 ```bash
 ros2 launch linorobot2_navigation navigation.launch.py \
-  map:=/absolute/path/to/<map_name>.yaml
+  map:=/absolute/path/to/<map_name>.yaml \
+  initial_pose_x:=0.0 initial_pose_y:=0.0 initial_pose_yaw:=0.0 \
+  lidar_safety:=false
 ```
 
-The custom launcher also supports:
+Pass `map:=` explicitly, and pass `lidar_safety:=false` with this snapshot, because the safety node packages are not in this repository. Without `map:=`, the launcher looks for a map named by the `LINOROBOT2_MAP` environment variable.
 
-```text
-initial_pose_x
-initial_pose_y
-initial_pose_yaw
-sim
-rviz
-lidar_safety
-safety_impl
-```
+### Human-aware launch
 
----
-
-## 26. Human-Aware Launch Integration
-
-Custom integration file:
-
-```text
-linorobot2_bringup/launch/social_nav.launch.py
-```
-
-The launch file is designed to coordinate:
-
-- RealSense D435 startup;
-- aligned depth;
-- YOLO pose perception;
-- Python/C++ tracker selection;
-- simulation time;
-- unified camera topics.
-
-Important launch arguments:
+`social_nav.launch.py` starts the RealSense driver, the pose detector and the tracker. It needs the perception and tracking packages listed in Section 2, so it will not run from this repository alone.
 
 | Argument | Default | Meaning |
 |---|---|---|
-| `sim` | `false` | use Gazebo `/clock` |
-| `camera` | `false` | launch the physical D435 |
-| `camera_reset` | `true` | hard-reset D435 at startup |
-| `camera_prefix` | `/camera` | camera topic prefix |
-| `debug_image` | `false` | publish annotated perception image |
-| `tracker_impl` | `cpp` | select C++ or Python tracker |
+| `sim` | `false` | Use simulated time; required in Gazebo |
+| `camera` | `false` | Start the physical D435 |
+| `camera_reset` | `true` | Hardware-reset the D435 at startup |
+| `tracker_impl` | `cpp` | `cpp` or `py` tracker |
+| `debug_image` | `false` | Publish the annotated detection image |
 
-Example intended real-robot invocation:
+### Firmware calibration
 
-```bash
-ros2 launch linorobot2_bringup social_nav.launch.py \
-  camera:=true \
-  tracker_impl:=cpp
-```
-
-For Gazebo:
-
-```bash
-ros2 launch linorobot2_bringup social_nav.launch.py \
-  sim:=true \
-  camera:=false \
-  tracker_impl:=cpp
-```
-
-The launch comments document an important simulation fix: every perception/tracking node must use `use_sim_time=true` in Gazebo, otherwise TF lookups mix wall-clock time with simulated time.
+Raise the robot so the wheels are off the ground, then flash `linorobot2_hardware/calibration` and use its serial commands to check motor direction and encoder sign and to measure counts per revolution over ten hand-turned revolutions. `linorobot2_hardware/README_PID_TUNING.txt` describes tuning the wheel PID live over the `/pid/*` topics.
 
 ---
 
-## 27. Calibration Procedure
+## 9. Known limitations of this snapshot
 
-The custom calibration firmware is located at:
-
-```text
-linorobot2_hardware/calibration/src/firmware.ino
-```
-
-### Safety first
-
-Elevate the robot so the wheels cannot drive the robot off the bench.
-
-### 27.1 Verify motor direction
-
-Build/upload the calibration firmware, then test each motor.
-
-If a wheel rotates backward, change the corresponding:
-
-```text
-MOTOR1_INV
-MOTOR2_INV
-```
-
-### 27.2 Verify encoder sign
-
-Forward wheel motion should produce a positive logical count after inversion is applied.
-
-If not, change:
-
-```text
-MOTOR1_ENCODER_INV
-MOTOR2_ENCODER_INV
-```
-
-### 27.3 Manual CPR measurement
-
-The custom calibration code supports a manual ten-revolution test.
-
-Conceptually:
-
-1. reset encoder;
-2. rotate one wheel exactly 10 turns by hand;
-3. read the encoder count;
-4. compute:
-
-```text
-CPR = |count| / 10
-```
-
-5. repeat several times;
-6. use the measured mean/representative value.
-
-The final checked-in value is 1799 for both drive wheels.
-
-### 27.4 Geometry
-
-Measure:
-
-- wheel diameter at the effective rolling surface;
-- center-to-center left/right wheel distance.
-
-Do not rely on a generic upstream robot dimension when accurate odometry is required.
+- **The human-aware packages are not here yet.** The launch files reference them, but the source lives in a separate workspace. They will be published once the interfaces settle.
+- **`navigation.yaml` is the baseline.** It contains no social cost layer, and the planner is NavFn with `use_astar: false`. Do not read it as the human-aware configuration.
+- **The safety chain is not yet consistent in this snapshot.** `navigation.launch.py` expects the Collision Monitor to output `cmd_vel_raw` so that the LiDAR safety node can publish the final `/cmd_vel`, but the checked-in YAML still outputs `cmd_vel`. This is why the run command above disables the safety node.
+- **The URDF wheel size lags the firmware.** The firmware uses the measured 0.09 m diameter, while `2wd_properties.urdf.xacro` still has a 0.04 m radius. This affects simulation, not the real robot's odometry.
+- **Only the stock maps are checked in** (`map`, `playground`, `turtlebot3_world`); the lab maps are not.
+- **No closed-loop human-aware results yet.** The measurements in Section 6 are component benchmarks.
 
 ---
 
-## 28. Performance-Oriented Design Decisions
+## 10. Roadmap and evaluation plan
 
-The robot computer is CPU-oriented, so the project intentionally avoids unnecessary processing.
+1. Publish the perception, tracking and safety packages with their parameter files and tests.
+2. Integrate the AGHPM cost layer, the social-cost-aware A* planner and the predictive local planner, and make the velocity safety chain consistent.
+3. Run the tracking-loss study in Gazebo with controlled occlusion: compare removing a lost person immediately, freezing the last position, propagating at constant velocity, and an adaptive strategy.
+4. Repeat the most informative scenarios on the real robot: a pedestrian crossing behind an obstacle, a head-on corridor encounter, and a person leaving and re-entering the camera view.
 
-Examples already reflected in the launch design:
+**Metrics**
 
-- RealSense point cloud disabled when not needed;
-- optional debug image disabled by default;
-- aligned depth used only for RGB-D human localization;
-- C++ tracker selected by default;
-- social perception period can be lower than the camera frame rate;
-- LiDAR remains the independent safety sensor.
+| Area | Metrics |
+|---|---|
+| Tracking | Position and velocity error, ID switches, track continuity through occlusion |
+| Navigation | Success rate, collisions, time to goal, path length |
+| Proximity | Minimum distance to a person, minimum time to collision, share of time inside personal space |
+| Motion quality | Angular velocity, acceleration, jerk, number of stops |
+| Real-time cost | Per-node latency and CPU load on the onboard computer |
 
-The launch comments record local tests where the C++ tracker was substantially lighter than the Python implementation, motivating `tracker_impl:=cpp` as the default.
-
----
-
-## 29. Known Snapshot Caveats
-
-This repository is an active research snapshot. Before claiming a fully reproducible Human-Aware build, check the following items.
-
-### 29.1 Social-navigation source synchronization
-
-The checked-in launch files already reference packages such as:
-
-```text
-social_nav_perception
-social_nav_tracking
-social_nav_tracking_cpp
-social_nav_safety
-social_nav_safety_cpp
-```
-
-The full development workspace must contain those packages for the Human-Aware launch path to run.
-
-### 29.2 Baseline Nav2 file vs research planner
-
-The currently checked-in `navigation.yaml` still represents a conventional baseline:
-
-- Rotation Shim + Regulated Pure Pursuit;
-- Navfn with `use_astar: false`;
-- no AGHPM plugin in the shown local/global costmap plugin lists.
-
-Therefore, treat this YAML as the **baseline Nav2 configuration**, not as proof that Cost-Aware A* + Predictive Human-Aware DWA are already active in every clone.
-
-### 29.3 Velocity safety-chain consistency
-
-The custom `navigation.launch.py` describes a chain in which Nav2 Collision Monitor should output `cmd_vel_raw` so the custom LiDAR safety node can publish the final `cmd_vel`.
-
-However, the checked-in `navigation.yaml` currently has:
-
-```yaml
-cmd_vel_out_topic: "cmd_vel"
-```
-
-Before enabling the custom safety node, make the velocity-topic chain consistent so two nodes do not compete for `/cmd_vel` and the safety node is actually interposed.
-
-### 29.4 URDF vs measured wheel geometry
-
-The measured firmware value is:
-
-```text
-wheel diameter = 0.09 m
-```
-
-while the checked-in `2wd_properties.urdf.xacro` currently uses:
-
-```text
-wheel_radius = 0.04 m
-```
-
-For accurate simulation-to-real comparison, synchronize the URDF wheel geometry with the final measured hardware geometry.
-
-These caveats are documented deliberately so the repository remains technically auditable rather than hiding configuration drift.
+Proximity metrics describe distance and timing only. They are not treated as a measure of how comfortable people feel; that would need a user study.
 
 ---
 
-## 30. Evaluation Metrics
+## 11. Credits and license
 
-Recommended metrics for the research stack:
+Built on [linorobot2](https://github.com/linorobot/linorobot2), [linorobot2_hardware](https://github.com/linorobot/linorobot2_hardware), [ROS 2](https://docs.ros.org/), [Nav2](https://navigation.ros.org/), [micro-ROS](https://micro.ros.org/), [robot_localization](https://github.com/cra-ros-pkg/robot_localization), [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox), [RealSense ROS](https://github.com/IntelRealSense/realsense-ros) and [SLLIDAR ROS 2](https://github.com/Slamtec/sllidar_ros2).
 
-### Perception and tracking
+Files that originate from linorobot2 and linorobot2_hardware keep their original copyright and Apache-2.0 license notices; see `linorobot2_hardware/LICENSE` and `linorobot2_ws1/src/linorobot2/LICENSE`.
 
-- 3D position RMSE;
-- velocity RMSE;
-- orientation MAE;
-- ID switches;
-- IDF1;
-- MOTA/HOTA when ground truth supports them.
-
-### Prediction
-
-- Average Displacement Error (ADE);
-- Final Displacement Error (FDE).
-
-### Navigation
-
-- success rate;
-- collision rate;
-- navigation time;
-- path length;
-- minimum human distance;
-- minimum TTC;
-- personal-space intrusion ratio;
-- integrated social cost.
-
-### Motion quality
-
-- angular velocity;
-- acceleration;
-- jerk;
-- stop-and-go frequency.
-
-### Real-time feasibility
-
-Measure runtime for:
-
-- perception;
-- tracking;
-- AGHPM update;
-- global planning;
-- local planning;
-- safety node.
-
----
-
-## 31. Troubleshooting
-
-### ESP32 is not publishing odometry
-
-```bash
-ls -l /dev/ttyUSB0
-ros2 topic echo /odom/unfiltered
-```
-
-Check:
-
-- serial permissions;
-- micro-ROS agent;
-- firmware transport;
-- 921600 baud;
-- correct ESP32 environment.
-
-### RPLIDAR does not start
-
-```bash
-ls -l /dev/rplidar
-ros2 topic hz /scan
-```
-
-Recreate the symlink if necessary:
-
-```bash
-sudo ln -sfn /dev/ttyUSB1 /dev/rplidar
-```
-
-### Robot moves in RViz while physically stationary
-
-Inspect the odometry/EKF input. The current real-robot configuration intentionally excludes IMU yaw because of gyro bias observed during commissioning.
-
-### AMCL never publishes a valid map-to-odom transform
-
-Check:
-
-- initial pose;
-- scan topic;
-- map path;
-- TF chain;
-- whether the custom launcher successfully wrote the initial pose into the temporary parameter file.
-
-### D435 node exists but no frames arrive
-
-Check:
-
-```bash
-ros2 topic hz /camera/color/image_raw
-ros2 topic hz /camera/aligned_depth_to_color/image_raw
-```
-
-Use the startup hardware reset if the device is stuck after an unclean previous shutdown.
-
-### Human tracker cannot transform LiDAR/camera data in Gazebo
-
-Make sure:
-
-```text
-sim:=true
-```
-
-so the nodes use simulated time rather than wall-clock time.
-
-### Social navigation build cannot find a package
-
-Confirm the full development social-navigation source tree is present under the ROS 2 workspace and rebuild with:
-
-```bash
-colcon build --symlink-install
-source install/setup.bash
-```
-
----
-
-## 32. Credits and License
-
-This work is built on the open-source ROS 2 mobile-robot ecosystem, especially:
-
-- [linorobot2](https://github.com/linorobot/linorobot2)
-- [linorobot2_hardware](https://github.com/linorobot/linorobot2_hardware)
-- [ROS 2](https://docs.ros.org/)
-- [Nav2](https://navigation.ros.org/)
-- [micro-ROS](https://micro.ros.org/)
-- [robot_localization](https://github.com/cra-ros-pkg/robot_localization)
-- [SLAM Toolbox](https://github.com/SteveMacenski/slam_toolbox)
-- [Intel RealSense ROS](https://github.com/IntelRealSense/realsense-ros)
-- [SLLIDAR ROS 2](https://github.com/Slamtec/sllidar_ros2)
-
-The upstream linorobot2 / linorobot2_hardware source files retain their original copyright and license notices.
-
-See the repository license files for details.
+**Contact:** Le Duc Minh, minhducle0305@gmail.com
