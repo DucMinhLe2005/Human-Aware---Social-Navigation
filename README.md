@@ -152,7 +152,7 @@ This baseline is the reference that the human-aware planners will be compared ag
 
 **Tracking.** Detections are associated to tracks with the Hungarian algorithm and filtered with a constant-velocity Kalman filter. Each track carries a persistent ID, position, velocity, heading, covariance and confidence, and is published on `/planning/tracked_humans`. Camera and LiDAR observations are both used as measurements.
 
-**Social-space model (AGHPM).** Personal space is modelled as an asymmetric Gaussian aligned with the person's heading: wider in front than behind. The current tuning is σ<sub>front</sub> = 0.50 m and σ<sub>back</sub> = 0.30 m. These are project tuning values, not universal constants. Planned extensions make the field grow with tracking uncertainty and shift with predicted motion.
+**Social-space model (AGHPM).** Personal space is modelled as an asymmetric Gaussian aligned with the person's heading: wider in front than behind. The current tuning (`navigation.yaml`) is σ<sub>front</sub> = 0.38 m, σ<sub>back</sub> = 0.30 m and σ<sub>side</sub> = 0.40 m. These are project tuning values, not universal constants. The field grows with walking speed and with the track covariance, and adds a decaying corridor along the predicted walking direction.
 
 **Planning.** The global planner adds social cost to obstacle cost, so a slightly longer route is accepted when it avoids cutting through someone's space. The local planner scores each candidate trajectory against where each person is predicted to be at the same instant, instead of against a static costmap.
 
