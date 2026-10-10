@@ -18,8 +18,10 @@ outcome:
     INVALID    infrastructure failure (goal never accepted / robot moved < 1 m);
                excluded from N and reported separately
 
-Metrics (per run, over the ACTIVE WINDOW = first non-zero velocity command to
-the end of the bag, in simulation time):
+Metrics (per run, over the GOAL WINDOW = goal start to goal end in simulation
+time, as logged in metrics.json; runs without a logged goal fall back to first
+non-zero velocity command -> end of the bag, and --window command forces that
+older definition; the window used is in the 'window' column of runs.csv):
     SZVR  time with clearance to any person < zone / window length
     MHC   minimum robot-person clearance (body shapes, not centres)
     PL    robot path length from ground truth
@@ -125,10 +127,12 @@ def parse_shape(spec):
 # ------------------------------------------------------------- core metrics
 def analyse_run(gt, cmd, people, robot_name='my_amr', robot_box=(-0.135, 0.135, -0.12, 0.12),
                 zone=0.5, collision_release=0.05, max_speed=2.0,
-                stop_v=0.01, stop_w=0.02, w_deadband=0.05):
+                stop_v=0.01, stop_w=0.02, w_deadband=0.05, t_start=None, t_end=None):
     """gt:  list of (t, {model: (x, y, yaw)})   ground truth, sim time
     cmd: list of (t, v, w)                      velocity commands, sim time
     people: {name: shape}
+    t_start, t_end: analysis window in sim time (the goal window). When not
+        given, the window is first non-zero command -> end of the bag.
     Returns a dict of per-run metrics, or None if there is no usable data."""
     gt = sorted((g for g in gt if robot_name in g[1]), key=lambda g: g[0])
     cmd = sorted(cmd, key=lambda c: c[0])
@@ -137,6 +141,8 @@ def analyse_run(gt, cmd, people, robot_name='my_amr', robot_box=(-0.135, 0.135, 
     moving_cmds = [c for c in cmd if abs(c[1]) > stop_v or abs(c[2]) > stop_w]
     t0 = moving_cmds[0][0] if moving_cmds else gt[0][0]
     t1 = gt[-1][0]
+    if t_start is not None and t_end is not None:
+        t0, t1 = max(t_start, gt[0][0]), min(t_end, gt[-1][0])
     if t1 <= t0:
         return None
 
@@ -149,6 +155,8 @@ def analyse_run(gt, cmd, people, robot_name='my_amr', robot_box=(-0.135, 0.135, 
     for t, poses in gt:
         if t < t0:
             continue
+        if t > t1:
+            break
         pose = poses[robot_name]
         if prev_t is not None:
             dt = t - prev_t
@@ -237,6 +245,18 @@ def analyse_run(gt, cmd, people, robot_name='my_amr', robot_box=(-0.135, 0.135, 
     }
 
 
+def goal_window(metrics):
+    """(start, end) of the navigation goal in sim time, as logged by
+    social_nav_metrics in metrics.json; None when it is not available."""
+    goals = [g for g in (metrics.get('goals') or [])
+             if isinstance(g, dict) and g.get('start') is not None and g.get('duration_s')]
+    if not goals:
+        return None
+    done = [g for g in goals if g.get('result') == 'SUCCEEDED']
+    g = (done or goals)[-1]
+    return float(g['start']), float(g['start']) + float(g['duration_s'])
+
+
 def outcome_of(goal, collisions, distance):
     if not goal or goal.startswith(INFRA_PREFIXES) or distance < 1.0:
         return 'INVALID'
@@ -311,13 +331,21 @@ def load_batch(batch_dir, people, args):
                 break
         m = None
         source = 'none'
+        window_kind = ''
         bag = os.path.join(run_dir, 'bag')
         if os.path.isdir(bag) and not args.no_bag:
             try:
                 gt, cmd = read_bag(bag, args.gt_topic, args.cmd_topic)
-                m = analyse_run(gt, cmd, people, args.robot,
-                                (-args.robot_length / 2, args.robot_length / 2,
-                                 -args.robot_width / 2, args.robot_width / 2), args.zone)
+                box = (-args.robot_length / 2, args.robot_length / 2,
+                       -args.robot_width / 2, args.robot_width / 2)
+                gw = goal_window(metrics) if args.window == 'goal' else None
+                if gw:
+                    m = analyse_run(gt, cmd, people, args.robot, box, args.zone,
+                                    t_start=gw[0], t_end=gw[1])
+                    window_kind = 'goal'
+                if m is None:       # no goal logged, or the bag does not cover it
+                    m = analyse_run(gt, cmd, people, args.robot, box, args.zone)
+                    window_kind = 'command'
                 source = 'bag' if m else 'none'
             except Exception as exc:        # keep going; report the run as metrics-only
                 print(f'  {os.path.basename(run_dir)}: cannot read bag ({exc})', file=sys.stderr)
@@ -339,6 +367,7 @@ def load_batch(batch_dir, people, args):
         rows.append({
             'run': os.path.basename(run_dir), 'scenario': args.scenario, 'method': args.method,
             'outcome': outcome, 'goal_txt': goal, 'data_source': source,
+            'window': window_kind if source == 'bag' else '',
             'collisions': collisions, 'collisions_metrics_node': node_collisions,
             'standing_collisions': standing,
             'szvr': m['szvr'], 'mhc_m': m['mhc_m'], 'path_length_m': m['path_length_m'],
@@ -415,6 +444,7 @@ def f_dist(d, unit='', scale=1.0, digits=2):
 def report(s, args):
     lines = [
         f"scenario / method      : {args.scenario} / {args.method}",
+        f"analysis window        : {s.get('windows', {})}",
         f"N counted runs         : {s['N']}  (+{s['invalid_excluded']} invalid, excluded; "
         f"{s['runs_with_bag']} with a bag)",
         f"SR  success rate       : {f_rate(s['SR'])}",
@@ -481,6 +511,19 @@ def self_test():
     print('self-test passed')
 
 
+def self_test_goal_window():
+    people = {'h': ('circle', 0.28)}
+    gt = [(i * 0.05, {'my_amr': (0.2 * i * 0.05, 0.0, 0.0), 'h': (50.0, 0.0, 0.0)})
+          for i in range(401)]                       # 20 s at 0.2 m/s
+    cmd = [(i * 0.05, 0.2, 0.0) for i in range(401)]
+    m = analyse_run(gt, cmd, people, t_start=5.0, t_end=15.0)
+    assert abs(m['window_s'] - 10.0) < 0.06, m['window_s']
+    assert abs(m['path_length_m'] - 2.0) < 0.02, m['path_length_m']
+    assert goal_window({'goals': [{'start': 3.0, 'duration_s': 4.0, 'result': 'SUCCEEDED'}]}) == (3.0, 7.0)
+    assert goal_window({}) is None
+    print('goal-window self-test passed')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('batch_dir', nargs='?')
@@ -495,10 +538,14 @@ def main():
     ap.add_argument('--robot-width', type=float, default=0.24)
     ap.add_argument('--gt-topic', default='/social_nav/ground_truth')
     ap.add_argument('--cmd-topic', default='/cmd_vel')
+    ap.add_argument('--window', choices=('goal', 'command'), default='goal',
+                    help='goal: goal start -> goal end from metrics.json (default); '
+                         'command: first non-zero command -> end of bag')
     ap.add_argument('--no-bag', action='store_true', help='use metrics.json only')
     args = ap.parse_args()
     if args.self_test:
-        return self_test()
+        self_test()
+        return self_test_goal_window()
     if not args.batch_dir:
         ap.error('batch_dir is required')
     people = dict(parse_shape(s) for s in args.people)
@@ -513,6 +560,8 @@ def main():
         w.writeheader()
         w.writerows(rows)
     s = summarise(rows)
+    s['windows'] = {k: sum(1 for r in rows if r['window'] == k)
+                    for k in sorted({r['window'] for r in rows if r['window']})}
     json.dump({'scenario': args.scenario, 'method': args.method, **s},
               open(os.path.join(out, 'summary.json'), 'w'), indent=2)
     text = report(s, args)
