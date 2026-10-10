@@ -18,9 +18,11 @@ BACKUP="$INST.psvsp_backup"
 [ -e "$INST" ] || [ -e "$BACKUP" ] || { echo "ERROR: $INST not found -- build the workspace first"; exit 1; }
 
 busy() {
-  # [x] keeps the pattern from matching the shell that runs this script
-  if pgrep -af '[g]z sim|[c]omponent_container|[r]un_batch\.sh|[b]t_navigator|[c]ontroller_server'; then
-    echo "ERROR: simulation stack or batch is running (listed above) -- stop it first"; exit 1
+  # Match process names, not command lines, so a shell that merely mentions
+  # these words is not mistaken for a running stack.
+  if pgrep -x 'component_conta|controller_serv|planner_server|bt_navigator|run_batch.sh' >/dev/null; then
+    pgrep -ax 'component_conta|controller_serv|planner_server|bt_navigator|run_batch.sh'
+    echo "ERROR: Nav2 or a batch is running (listed above) -- stop it first"; exit 1
   fi
 }
 
