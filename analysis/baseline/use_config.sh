@@ -3,7 +3,8 @@
 # navigation.launch.py always loads the installed file, so this is the only way
 # to change the controller without editing src_humanaware.
 #
-#   use_config.sh dwb      install the generated DWB baseline config
+#   use_config.sh dwb         DWB, social layer removed (human-unaware baseline)
+#   use_config.sh dwb_social  DWB on the same social costmap as PS-VSP (ablation)
 #   use_config.sh psvsp    restore the original PS-VSP config
 #   use_config.sh status   show which one is active
 #
@@ -37,11 +38,12 @@ status() {
 }
 
 case "${1:-status}" in
-  dwb)
+  dwb|dwb_social)
     busy
-    [ -e "$BACKUP" ] && { echo "already on the baseline config"; status; exit 0; }
+    [ -e "$BACKUP" ] && { echo "a baseline config is already installed -- run 'use_config.sh psvsp' first"; status; exit 1; }
     TMP="$(mktemp)"
-    python3 "$HERE/make_dwb_yaml.py" "$SRC" "$TMP"
+    FLAG=""; [ "$1" = "dwb_social" ] && FLAG="--keep-social-layer"
+    python3 "$HERE/make_dwb_yaml.py" "$SRC" "$TMP" $FLAG
     mv "$INST" "$BACKUP"          # moves the symlink itself, not its target
     cp "$TMP" "$INST"; rm -f "$TMP"
     status ;;
@@ -52,5 +54,5 @@ case "${1:-status}" in
     cmp -s "$(readlink -f "$INST")" "$SRC" || { echo "ERROR: restored file differs from src"; exit 1; }
     status ;;
   status) status ;;
-  *) echo "usage: $0 dwb|psvsp|status"; exit 2 ;;
+  *) echo "usage: $0 dwb|dwb_social|psvsp|status"; exit 2 ;;
 esac
