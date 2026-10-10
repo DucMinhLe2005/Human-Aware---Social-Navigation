@@ -258,7 +258,11 @@ def goal_window(metrics):
 
 
 def outcome_of(goal, collisions, distance):
-    if not goal or goal.startswith(INFRA_PREFIXES) or distance < 1.0:
+    # INVALID = the goal never started (infrastructure). A robot that accepted
+    # the goal and then did not move is a navigation failure, not an invalid run.
+    if not goal or goal.startswith(INFRA_PREFIXES):
+        return 'INVALID'
+    if goal.startswith('GOAL_REACHED') and distance < 1.0:
         return 'INVALID'
     if collisions > 0:
         return 'COLLISION'
@@ -362,12 +366,16 @@ def load_batch(batch_dir, people, args):
         collisions = max(m['collisions'], node_collisions or 0)
         distance = m['path_length_m'] if m['path_length_m'] is not None else 0.0
         outcome = outcome_of(goal, collisions, distance)
+        gw_all = goal_window(metrics)
+        goal_start = gw_all[0] if gw_all else None
+        phase = (goal_start % args.actor_period) if goal_start is not None else None
         standing = sum(v['collisions'] for k, v in m.get('per_person', {}).items()
                        if not k.startswith('actor'))
         rows.append({
             'run': os.path.basename(run_dir), 'scenario': args.scenario, 'method': args.method,
             'outcome': outcome, 'goal_txt': goal, 'data_source': source,
             'window': window_kind if source == 'bag' else '',
+            'goal_start_s': goal_start, 'phase_s': phase,
             'collisions': collisions, 'collisions_metrics_node': node_collisions,
             'standing_collisions': standing,
             'szvr': m['szvr'], 'mhc_m': m['mhc_m'], 'path_length_m': m['path_length_m'],
@@ -430,6 +438,18 @@ def summarise(rows):
     }
 
 
+def phase_table(rows, period, bins):
+    """Outcome by pedestrian phase at goal start (phase = goal start mod period)."""
+    runs = [r for r in rows if r['outcome'] != 'INVALID' and r.get('phase_s') is not None]
+    table = []
+    for b in range(bins):
+        x = [r for r in runs if min(int(r['phase_s'] / period * bins), bins - 1) == b]
+        table.append({'from_s': b * period / bins, 'to_s': (b + 1) * period / bins, 'n': len(x),
+                      'success': sum(r['outcome'] == 'SUCCESS' for r in x),
+                      'collision': sum(r['collisions'] > 0 for r in x)})
+    return table
+
+
 def f_rate(r):
     return f"{100 * r['rate']:.1f}% ({r['count']}) [95% CI {100 * r['ci95'][0]:.1f}-{100 * r['ci95'][1]:.1f}%]"
 
@@ -465,6 +485,12 @@ def report(s, args):
         f"full stops per run     : {f_dist(s['stops'], '', 1.0, 0)}",
         f"omega sign changes/run : {f_dist(s['omega_sign_changes'], '', 1.0, 0)}",
     ]
+    if s.get('phase_table'):
+        lines.append(f"by pedestrian phase at goal start (period {args.actor_period} s):")
+        lines.append("  phase (s)        n   success  collision")
+        for b in s['phase_table']:
+            sr = f"{100.0 * b['success'] / b['n']:5.1f}%" if b['n'] else '    --'
+            lines.append(f"  {b['from_s']:5.2f}-{b['to_s']:5.2f}  {b['n']:4d}  {b['success']:4d} {sr}  {b['collision']:4d}")
     return '\n'.join(lines)
 
 
@@ -505,7 +531,7 @@ def self_test():
     assert outcome_of('TIMEOUT after 200s', 0, 6.0) == 'TIMEOUT'
     assert outcome_of('GOAL_ENDED status=6 | 30.0s', 0, 6.0) == 'ABORTED'
     assert outcome_of('NO navigate_to_pose action server', 0, 0.0) == 'INVALID'
-    assert outcome_of('TIMEOUT after 200s', 0, 0.3) == 'INVALID'
+    assert outcome_of('TIMEOUT after 200s', 0, 0.3) == 'TIMEOUT'
     lo, hi = wilson(91, 100)
     assert abs(lo - 0.8377) < 1e-3 and abs(hi - 0.9519) < 1e-3
     print('self-test passed')
@@ -521,6 +547,13 @@ def self_test_goal_window():
     assert abs(m['path_length_m'] - 2.0) < 0.02, m['path_length_m']
     assert goal_window({'goals': [{'start': 3.0, 'duration_s': 4.0, 'result': 'SUCCEEDED'}]}) == (3.0, 7.0)
     assert goal_window({}) is None
+    assert outcome_of('TIMEOUT after 200s', 0, 0.2) == 'TIMEOUT'      # frozen robot = failure
+    assert outcome_of('GOAL_ENDED status=6', 0, 0.0) == 'ABORTED'
+    assert outcome_of('NO navigate_to_pose action server', 0, 0.0) == 'INVALID'
+    assert outcome_of('GOAL_REACHED | 50.0s', 1, 14.0) == 'COLLISION'
+    t = phase_table([{'outcome': 'SUCCESS', 'collisions': 0, 'phase_s': 0.5},
+                     {'outcome': 'COLLISION', 'collisions': 1, 'phase_s': 13.0}], 13.4286, 8)
+    assert t[0]['success'] == 1 and t[7]['collision'] == 1
     print('goal-window self-test passed')
 
 
@@ -541,6 +574,9 @@ def main():
     ap.add_argument('--window', choices=('goal', 'command'), default='goal',
                     help='goal: goal start -> goal end from metrics.json (default); '
                          'command: first non-zero command -> end of bag')
+    ap.add_argument('--actor-period', type=float, default=13.4286,
+                    help='pedestrian cycle in the scenario (s); dymap = 13.4286')
+    ap.add_argument('--phase-bins', type=int, default=8)
     ap.add_argument('--no-bag', action='store_true', help='use metrics.json only')
     args = ap.parse_args()
     if args.self_test:
@@ -560,6 +596,7 @@ def main():
         w.writeheader()
         w.writerows(rows)
     s = summarise(rows)
+    s['phase_table'] = phase_table(rows, args.actor_period, args.phase_bins)
     s['windows'] = {k: sum(1 for r in rows if r['window'] == k)
                     for k in sorted({r['window'] for r in rows if r['window']})}
     json.dump({'scenario': args.scenario, 'method': args.method, **s},
