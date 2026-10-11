@@ -6,6 +6,7 @@
 #   use_config.sh dwb         DWB, social layer removed (human-unaware baseline)
 #   use_config.sh dwb_social  DWB on the same social costmap as PS-VSP (ablation)
 #   use_config.sh psvsp_nosocial  PS-VSP without the social costmap layer (ablation)
+#   use_config.sh psvsp_staticzone  PS-VSP with a symmetric, static, non-predictive zone (ablation)
 #   use_config.sh dwb_debug   as dwb, publishing critic scores on /evaluation
 #                             (diagnostic runs only, never for reported batches)
 #   use_config.sh psvsp    restore the original PS-VSP config
@@ -35,19 +36,21 @@ status() {
   plugin=$(grep -m1 -A1 '^ *FollowPath:' "$INST" | grep plugin | sed 's/.*plugin: *//; s/["'\'']//g')
   echo "active controller : $plugin"
   echo "social layer      : $(grep -c aghpm_social_layer "$INST" | sed 's/^0$/removed/; s/^[1-9].*/present/')"
+  echo "zone prediction   : $(grep -c 'velocity_future_enabled: true' "$INST" | sed 's/^0$/off/; s/^[1-9].*/on/')"
   echo "installed file md5: $(md5sum "$(readlink -f "$INST")" | cut -c1-12)"
   [ -e "$BACKUP" ] && echo "state             : BASELINE (PS-VSP config kept at $BACKUP)" \
                    || echo "state             : PS-VSP (original)"
 }
 
 case "${1:-status}" in
-  dwb|dwb_social|psvsp_nosocial|dwb_debug)
+  dwb|dwb_social|psvsp_nosocial|psvsp_staticzone|dwb_debug)
     busy
     [ -e "$BACKUP" ] && { echo "a baseline config is already installed -- run 'use_config.sh psvsp' first"; status; exit 1; }
     TMP="$(mktemp)"
     FLAG=""
     [ "$1" = "dwb_social" ] && FLAG="--keep-social-layer"
     [ "$1" = "psvsp_nosocial" ] && FLAG="--keep-controller"
+    [ "$1" = "psvsp_staticzone" ] && FLAG="--static-zone"
     [ "$1" = "dwb_debug" ] && FLAG="--debug"
     python3 "$HERE/make_dwb_yaml.py" "$SRC" "$TMP" $FLAG
     mv "$INST" "$BACKUP"          # moves the symlink itself, not its target
@@ -60,5 +63,5 @@ case "${1:-status}" in
     cmp -s "$(readlink -f "$INST")" "$SRC" || { echo "ERROR: restored file differs from src"; exit 1; }
     status ;;
   status) status ;;
-  *) echo "usage: $0 dwb|dwb_social|psvsp_nosocial|dwb_debug|psvsp|status"; exit 2 ;;
+  *) echo "usage: $0 dwb|dwb_social|psvsp_nosocial|psvsp_staticzone|dwb_debug|psvsp|status"; exit 2 ;;
 esac
