@@ -17,6 +17,12 @@
 #   3. It releases the batch lock in child processes and stops the stack at the end.
 #
 # Usage: run_phase_batch.sh [N=200] [output_dir]      env: SEED (default 20261010)
+#
+# Resuming an interrupted batch: START_SLOT=<k> continues the SAME schedule from
+# slot k in the SAME output directory (new run directories continue the
+# numbering). The seed, N and the installed configuration must be unchanged;
+# the script checks the schedule and the configuration hash and writes
+# resume.txt. A resumed batch must be reported as such.
 set +u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS="${WS:-$(cd "$HERE/../src_humanaware" && pwd)}"
@@ -29,8 +35,12 @@ OUT_ROOT="${2:-$WS/results/$(date +%Y%m%d_%H%M)_phase_${N}}"
 MAX_TRIES=3
 export LOG_DIR="$WS/log/run_batch"
 mkdir -p "$OUT_ROOT" "$LOG_DIR"
-if ls -d "$OUT_ROOT"/run_* >/dev/null 2>&1; then
-  echo "output directory already contains runs -- aborting"; exit 1
+START_SLOT="${START_SLOT:-1}"
+if [ "$START_SLOT" -le 1 ] && ls -d "$OUT_ROOT"/run_* >/dev/null 2>&1; then
+  echo "output directory already contains runs -- aborting (use START_SLOT to resume)"; exit 1
+fi
+if [ "$START_SLOT" -gt 1 ] && [ ! -f "$OUT_ROOT/schedule.csv" ]; then
+  echo "START_SLOT given but $OUT_ROOT has no schedule.csv -- aborting"; exit 1
 fi
 source /opt/ros/jazzy/setup.bash
 source "$WS/install/setup.bash"
@@ -40,7 +50,8 @@ if ! flock -n 9; then
   echo "another batch is already running -- aborting"; exit 1
 fi
 
-python3 - "$N" "$SEED" "$PERIOD" > "$OUT_ROOT/schedule.csv" <<'PY'
+SCHED="$OUT_ROOT/schedule.csv"; [ "$START_SLOT" -gt 1 ] && SCHED="$(mktemp)"
+python3 - "$N" "$SEED" "$PERIOD" > "$SCHED" <<'PY'
 import random, sys
 n, seed, period = int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3])
 rng = random.Random(seed)
@@ -51,7 +62,17 @@ for k, d in enumerate(delays, 1):
     print(f'{k},{d:.3f}')
 PY
 
-{
+INST_YAML="$WS/install/linorobot2_navigation/share/linorobot2_navigation/config/navigation.yaml"
+if [ "$START_SLOT" -gt 1 ]; then
+  cmp -s "$SCHED" "$OUT_ROOT/schedule.csv" || { echo "schedule differs from the original batch (N or SEED changed) -- aborting"; exit 1; }
+  rm -f "$SCHED"
+  OLD_MD5=$(grep '^navigation.yaml md5:' "$OUT_ROOT/code_version.txt" | awk '{print $3}')
+  NEW_MD5=$(md5sum "$(readlink -f "$INST_YAML")" | cut -c1-12)
+  [ "$OLD_MD5" = "$NEW_MD5" ] || { echo "installed navigation.yaml ($NEW_MD5) differs from the batch ($OLD_MD5) -- aborting"; exit 1; }
+  LAST=$(ls -d "$OUT_ROOT"/run_* 2>/dev/null | sed 's/.*run_//' | sort -n | tail -1)
+  echo "resumed: $(date '+%F %T') from slot $START_SLOT; run directories continue after run_${LAST:-0}; commit $(git -C "$WS" log --oneline -1 2>/dev/null)" >> "$OUT_ROOT/resume.txt"
+fi
+[ "$START_SLOT" -gt 1 ] || {
   echo "started: $(date '+%F %T')"
   echo "commit:  $(git -C "$WS" log --oneline -1 2>/dev/null)"
   echo "runner:  analysis/run_phase_batch.sh  N=$N  SEED=$SEED  PERIOD=$PERIOD"
@@ -76,10 +97,12 @@ stop_stack() {
   pkill -KILL -f "social_nav.launch.py|navigation.launch.py|gazebo.launch.py|gz sim|human_tracker_node1|yolo_pose_node1|lidar_safety_node1|component_container_isolated|parameter_bridge|ekf_node|robot_state_publisher|social_nav_metrics|command_timeout|ros_gz_bridge" 2>/dev/null
 }
 
-echo "[$(date '+%F %T')] START: $N scheduled runs (seed $SEED) -> $OUT_ROOT"
+echo "[$(date '+%F %T')] START: $N scheduled runs (seed $SEED), from slot $START_SLOT -> $OUT_ROOT"
 i=0; DONE=0; INFRA=0
+if [ "$START_SLOT" -gt 1 ]; then i="${LAST:-0}"; DONE=$((START_SLOT-1)); fi
 while IFS=, read -r SLOT DELAY; do
   [ "$SLOT" = "slot" ] && continue
+  [ "$SLOT" -lt "$START_SLOT" ] && continue
   TRY=0
   while :; do
     TRY=$((TRY+1)); i=$((i+1))
