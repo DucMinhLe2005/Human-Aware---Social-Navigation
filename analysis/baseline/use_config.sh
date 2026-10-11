@@ -5,6 +5,9 @@
 #
 #   use_config.sh dwb         DWB, social layer removed (human-unaware baseline)
 #   use_config.sh dwb_social  DWB on the same social costmap as PS-VSP (ablation)
+#   use_config.sh psvsp_nosocial  PS-VSP without the social costmap layer (ablation)
+#   use_config.sh dwb_debug   as dwb, publishing critic scores on /evaluation
+#                             (diagnostic runs only, never for reported batches)
 #   use_config.sh psvsp    restore the original PS-VSP config
 #   use_config.sh status   show which one is active
 #
@@ -38,11 +41,14 @@ status() {
 }
 
 case "${1:-status}" in
-  dwb|dwb_social)
+  dwb|dwb_social|psvsp_nosocial|dwb_debug)
     busy
     [ -e "$BACKUP" ] && { echo "a baseline config is already installed -- run 'use_config.sh psvsp' first"; status; exit 1; }
     TMP="$(mktemp)"
-    FLAG=""; [ "$1" = "dwb_social" ] && FLAG="--keep-social-layer"
+    FLAG=""
+    [ "$1" = "dwb_social" ] && FLAG="--keep-social-layer"
+    [ "$1" = "psvsp_nosocial" ] && FLAG="--keep-controller"
+    [ "$1" = "dwb_debug" ] && FLAG="--debug"
     python3 "$HERE/make_dwb_yaml.py" "$SRC" "$TMP" $FLAG
     mv "$INST" "$BACKUP"          # moves the symlink itself, not its target
     cp "$TMP" "$INST"; rm -f "$TMP"
@@ -54,5 +60,5 @@ case "${1:-status}" in
     cmp -s "$(readlink -f "$INST")" "$SRC" || { echo "ERROR: restored file differs from src"; exit 1; }
     status ;;
   status) status ;;
-  *) echo "usage: $0 dwb|dwb_social|psvsp|status"; exit 2 ;;
+  *) echo "usage: $0 dwb|dwb_social|psvsp_nosocial|dwb_debug|psvsp|status"; exit 2 ;;
 esac
