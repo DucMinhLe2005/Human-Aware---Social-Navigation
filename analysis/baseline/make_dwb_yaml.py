@@ -3,7 +3,7 @@
 
     python3 make_dwb_yaml.py <navigation.yaml> <output.yaml>
                              [--keep-social-layer] [--keep-controller] [--debug]
-                             [--static-zone]
+                             [--static-zone] [--mppi]
 
 Exactly two things change; everything else (AMCL, NavFn A*, goal checker,
 inflation, velocity smoother, collision monitor, behaviours) is copied as is:
@@ -27,6 +27,12 @@ layer's parameters change: the zone becomes a symmetric, static Gaussian
 (front = back = side width, no growth with speed or tracker covariance, no
 predicted corridor). Radius and cost ceiling are unchanged. This isolates the
 asymmetric, adaptive and predictive parts of the Predictive Social Zone.
+
+With --mppi the replacement controller is Nav2's MPPI controller instead of
+DWB, with the parameters of nav2_bringup/params/nav2_params.yaml (branch
+jazzy) except: the velocity and acceleration limits are those of PS-VSP and
+the velocity smoother, and visualisation is off. --mppi combines with
+--keep-social-layer (MPPI on the PSZ costmap) or alone (no PSZ).
 
 --debug (DWB only, diagnostic runs, never for reported batches) makes DWB
 publish every critic's score on /evaluation.
@@ -87,6 +93,45 @@ def dwb_params(old, smoother, goal_checker):
     }
 
 
+def mppi_params(old, smoother):
+    """Nav2 MPPI, defaults of nav2_bringup/params/nav2_params.yaml (jazzy branch,
+    checked 2026-10-13). Only the limits are taken from the PS-VSP configuration,
+    so both controllers work under the same constraints; visualisation is off."""
+    acc_x, _, acc_w = [float(a) for a in smoother['max_accel']]
+    dec_x, _, _ = [float(a) for a in smoother['max_decel']]
+    critic = lambda **kw: dict(enabled=True, cost_power=1, **kw)
+    return {
+        'plugin': 'nav2_mppi_controller::MPPIController',
+        'time_steps': 56, 'model_dt': 0.05, 'batch_size': 2000,
+        'ax_max': acc_x, 'ax_min': dec_x, 'ay_max': 3.0, 'ay_min': -3.0, 'az_max': acc_w,
+        'vx_std': 0.2, 'vy_std': 0.2, 'wz_std': 0.4,
+        'vx_max': float(old['max_linear_vel']), 'vx_min': float(old['min_linear_vel']),
+        'vy_max': 0.5, 'wz_max': float(old['max_angular_vel']),
+        'iteration_count': 1, 'prune_distance': 1.7, 'transform_tolerance': 0.1,
+        'temperature': 0.3, 'gamma': 0.015, 'motion_model': 'DiffDrive',
+        'visualize': False, 'regenerate_noises': True,
+        'TrajectoryVisualizer': {'trajectory_step': 5, 'time_step': 3},
+        'AckermannConstraints': {'min_turning_r': 0.2},
+        'critics': ['ConstraintCritic', 'CostCritic', 'GoalCritic', 'GoalAngleCritic',
+                    'PathAlignCritic', 'PathFollowCritic', 'PathAngleCritic',
+                    'PreferForwardCritic'],
+        'ConstraintCritic': critic(cost_weight=4.0),
+        'GoalCritic': critic(cost_weight=5.0, threshold_to_consider=1.4),
+        'GoalAngleCritic': critic(cost_weight=3.0, threshold_to_consider=0.5),
+        'PreferForwardCritic': critic(cost_weight=5.0, threshold_to_consider=0.5),
+        'CostCritic': critic(cost_weight=3.81, near_collision_cost=253, critical_cost=300.0,
+                             consider_footprint=False, collision_cost=1000000.0,
+                             near_goal_distance=1.0, trajectory_point_step=2),
+        'PathAlignCritic': critic(cost_weight=14.0, max_path_occupancy_ratio=0.05,
+                                  trajectory_point_step=4, threshold_to_consider=0.5,
+                                  offset_from_furthest=20, use_path_orientations=False),
+        'PathFollowCritic': critic(cost_weight=5.0, offset_from_furthest=5,
+                                   threshold_to_consider=1.4),
+        'PathAngleCritic': critic(cost_weight=2.0, offset_from_furthest=4,
+                                  threshold_to_consider=0.5, max_angle_to_furthest=1.0, mode=0),
+    }
+
+
 STATIC_ZONE = {
     'sigma_back': None, 'sigma_side': None,        # filled with sigma_front
     'velocity_social_enabled': False,
@@ -108,12 +153,14 @@ def static_zone(params):
     return params
 
 
-def convert(params, keep_social=False, keep_controller=False, debug=False):
+def convert(params, keep_social=False, keep_controller=False, debug=False, mppi=False):
     ctrl = params['controller_server']['ros__parameters']
     old = ctrl['FollowPath']
     if 'HumanAwareController' not in old['plugin']:
         raise SystemExit(f"unexpected controller plugin: {old['plugin']}")
-    if not keep_controller:
+    if mppi:
+        ctrl['FollowPath'] = mppi_params(old, params['velocity_smoother']['ros__parameters'])
+    elif not keep_controller:
         ctrl['FollowPath'] = dwb_params(
             old, params['velocity_smoother']['ros__parameters'], ctrl['general_goal_checker'])
         if debug:
@@ -142,7 +189,7 @@ def changed_keys(a, b, prefix=''):
 
 
 def main():
-    flags = ('--keep-social-layer', '--keep-controller', '--debug', '--static-zone')
+    flags = ('--keep-social-layer', '--keep-controller', '--debug', '--static-zone', '--mppi')
     if '--static-zone' in sys.argv:
         if len([a for a in sys.argv if a in flags]) != 1:
             raise SystemExit('--static-zone cannot be combined with other flags')
@@ -164,6 +211,9 @@ def main():
     keep = '--keep-social-layer' in sys.argv
     keep_ctrl = '--keep-controller' in sys.argv
     debug = '--debug' in sys.argv
+    mppi = '--mppi' in sys.argv
+    if mppi and (keep_ctrl or debug):
+        raise SystemExit('--mppi combines only with --keep-social-layer')
     if keep and keep_ctrl:
         raise SystemExit('--keep-social-layer with --keep-controller is the unmodified config')
     if debug and keep_ctrl:
@@ -173,7 +223,7 @@ def main():
         raise SystemExit(__doc__)
     sys.argv = argv
     src = yaml.safe_load(open(sys.argv[1]))
-    out = convert(yaml.safe_load(open(sys.argv[1])), keep, keep_ctrl, debug)
+    out = convert(yaml.safe_load(open(sys.argv[1])), keep, keep_ctrl, debug, mppi)
     allowed = ('controller_server.ros__parameters.FollowPath',
                'local_costmap.local_costmap.ros__parameters.plugins',
                'local_costmap.local_costmap.ros__parameters.' + SOCIAL_LAYER,
@@ -184,10 +234,10 @@ def main():
         raise SystemExit(f'unexpected differences: {stray}')
     with open(sys.argv[2], 'w') as f:
         f.write('# GENERATED by analysis/baseline/make_dwb_yaml.py -- '
-                + ('PS-VSP' if keep_ctrl else 'DWB') + ', social layer '
+                + ('PS-VSP' if keep_ctrl else 'MPPI' if mppi else 'DWB') + ', social layer '
                 + ('kept' if keep else 'removed') + (', DEBUG' if debug else '') + '.\n')
         yaml.safe_dump(out, f, default_flow_style=False, sort_keys=False)
-    print(f'wrote {sys.argv[2]}: ' + ('PS-VSP' if keep_ctrl else 'DWB') + ' controller, social layer '
+    print(f'wrote {sys.argv[2]}: ' + ('PS-VSP' if keep_ctrl else 'MPPI' if mppi else 'DWB') + ' controller, social layer '
           + ('kept in both costmaps' if keep else 'removed from both costmaps')
           + (' -- DEBUG, not for reported batches' if debug else ''))
 
