@@ -6,6 +6,8 @@
 #   use_config.sh dwb         DWB, social layer removed (human-unaware baseline)
 #   use_config.sh dwb_social  DWB on the same social costmap as PS-VSP (ablation)
 #   use_config.sh psvsp_nosocial  PS-VSP without the social costmap layer (ablation)
+#   use_config.sh mppi        Nav2 MPPI, social layer removed (human-unaware baseline)
+#   use_config.sh mppi_social Nav2 MPPI on the same social costmap as PS-VSP
 #   use_config.sh psvsp_staticzone  PS-VSP with a symmetric, static, non-predictive zone (ablation)
 #   use_config.sh dwb_debug   as dwb, publishing critic scores on /evaluation
 #                             (diagnostic runs only, never for reported batches)
@@ -43,7 +45,7 @@ status() {
 }
 
 case "${1:-status}" in
-  dwb|dwb_social|psvsp_nosocial|psvsp_staticzone|dwb_debug)
+  dwb|dwb_social|psvsp_nosocial|psvsp_staticzone|dwb_debug|mppi|mppi_social)
     busy
     [ -e "$BACKUP" ] && { echo "a baseline config is already installed -- run 'use_config.sh psvsp' first"; status; exit 1; }
     TMP="$(mktemp)"
@@ -52,6 +54,8 @@ case "${1:-status}" in
     [ "$1" = "psvsp_nosocial" ] && FLAG="--keep-controller"
     [ "$1" = "psvsp_staticzone" ] && FLAG="--static-zone"
     [ "$1" = "dwb_debug" ] && FLAG="--debug"
+    [ "$1" = "mppi" ] && FLAG="--mppi"
+    [ "$1" = "mppi_social" ] && FLAG="--mppi --keep-social-layer"
     python3 "$HERE/make_dwb_yaml.py" "$SRC" "$TMP" $FLAG
     mv "$INST" "$BACKUP"          # moves the symlink itself, not its target
     cp "$TMP" "$INST"; rm -f "$TMP"
@@ -63,5 +67,5 @@ case "${1:-status}" in
     cmp -s "$(readlink -f "$INST")" "$SRC" || { echo "ERROR: restored file differs from src"; exit 1; }
     status ;;
   status) status ;;
-  *) echo "usage: $0 dwb|dwb_social|psvsp_nosocial|psvsp_staticzone|dwb_debug|psvsp|status"; exit 2 ;;
+  *) echo "usage: $0 dwb|dwb_social|mppi|mppi_social|psvsp_nosocial|psvsp_staticzone|dwb_debug|psvsp|status"; exit 2 ;;
 esac
